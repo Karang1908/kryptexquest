@@ -60,7 +60,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
   function render() {
     const hub = C.stops.find((s) => s.role === 'hub');
     const row = (s, i, fixed) => `<div class="loc-item ${C.selected === s.id ? 'active' : ''} ${fixed ? 'fixed-row' : ''}" data-select="${esc(s.id)}">
-        <span class="meta"><strong>${fixed ? '⌂' : `${i + 1}.${ROLE_ICON[s.role] ? ' ' + ROLE_ICON[s.role] : ''}`} ${esc(s.place)}</strong><small>${s.role === 'hub' ? 'Base · players start and hand in flags here' : `${s.role === 'bonus' ? 'Bonus · ' : ''}${s.entryMode === 'hub' ? 'opens at base · ' : s.entryMode === 'open' ? 'open · ' : ''}${s.puzzles.length} question${s.puzzles.length === 1 ? '' : 's'} · r ${s.radius} m`}</small></span>
+        <span class="meta"><strong>${fixed ? '⌂' : `${i + 1}.${ROLE_ICON[s.role] ? ' ' + ROLE_ICON[s.role] : ''}`} ${esc(s.place)}</strong><small>${s.role === 'hub' ? 'Base · players start and hand in flags here' : `${s.role === 'bonus' ? 'Bonus · ' : ''}${s.entryMode === 'open' ? 'released from the start · ' : ''}${s.puzzles.length} question${s.puzzles.length === 1 ? '' : 's'} · r ${s.radius} m`}</small></span>
         ${fixed ? '' : `<span class="mv"><span data-move="${esc(s.id)}:-1" title="Move earlier">▲</span><span data-move="${esc(s.id)}:1" title="Move later">▼</span></span>`}</div>`;
     $('#locList').innerHTML = (hub ? row(hub, 0, true) : '<div class="hint">No base yet. Add a location and make it the Base.</div>')
       + playable().map((s, i) => row(s, i, false)).join('')
@@ -80,12 +80,12 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
     const isHubStop = stop.role === 'hub';
     const questions = isHubStop ? '' : stop.puzzles.map((p) => questionCard(stop, p)).join('') + C.draftQuestions.filter((d) => d.stop === stop.id).map(draftCard).join('');
     const roleOptions = ['hub', 'stop', 'bonus'].map((r) => `<option value="${r}" ${stop.role === r ? 'selected' : ''}>${{ hub: 'Base (start / hand-in point)', stop: 'Location', bonus: 'Bonus question (finish screen, needs no location)' }[r]}</option>`).join('');
-    const modeOptions = [['chain', 'Sequential: unlocks when players walk in, once the previous location\'s code is handed in at the base'], ['hub', 'Unlocked by answering a question at the base'], ['open', 'Always unlockable: just walk in']].map(([v, l]) => `<option value="${v}" ${stop.entryMode === v ? 'selected' : ''}>${l}</option>`).join('');
+    const modeOptions = [['chain', 'Sequential: hint + entry question are released at the base after the previous location\'s code is handed in'], ['open', 'Released right after check-in']].map(([v, l]) => `<option value="${v}" ${stop.entryMode === v ? 'selected' : ''}>${l}</option>`).join('');
     box.innerHTML = `<div class="panel"><h3>${stop.isNew ? 'NEW LOCATION' : isHubStop ? 'BASE' : `LOCATION ${stop.ord}`}</h3>
       <div class="form-grid">
         <label class="field">ID (permanent, a-z 0-9 - _)<input id="ed-id" value="${esc(stop.id)}" ${stop.isNew ? '' : 'disabled'} placeholder="cafeteria" /></label>
         <label class="field">ROLE<select id="ed-role">${roleOptions}</select></label>
-        ${field('ed-place', 'PLACE NAME (REVEALED WHEN DISCOVERED)', stop.place)}
+        ${field('ed-place', 'PLACE NAME (SHOWN WHEN A TEAM UNLOCKS IT)', stop.place)}
         ${field('ed-name', 'QUEST TITLE', stop.name)}
         ${field('ed-label', 'BADGE TEXT', stop.label)}
         ${field('ed-icon', 'ICON (EMOJI OR SYMBOL)', stop.icon)}
@@ -95,9 +95,9 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
         ${field('ed-lat', 'LATITUDE', stop.lat)}
         ${field('ed-lng', 'LONGITUDE', stop.lng)}
         <div class="field"><span>POSITION</span><button type="button" class="btn" id="edPlace">Place on the map…</button></div>
-        ${isHubStop || stop.role === 'bonus' ? '' : `<label class="field wide">HINT SHOWN AT THE BASE (HOW PLAYERS FIND THIS PLACE)<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>`}
-        ${stop.role === 'stop' ? `<label class="field wide">HOW IS IT UNLOCKED?<select id="ed-mode">${modeOptions}</select></label>` : ''}
-        ${stop.role === 'stop' && stop.entryMode === 'hub' ? `${field('ed-eq', 'BASE QUESTION (SHOWN AT THE BASE)', stop.entryQuestion || '', 'wide')}${field('ed-ea', 'ITS ANSWER (UNLOCKS THIS LOCATION)', stop.entryAnswer || '', 'wide')}` : ''}
+        ${isHubStop || stop.role === 'bonus' ? '' : `<label class="field wide">HINT SHOWN AT THE BASE ONCE RELEASED (HOW PLAYERS FIND THIS HIDDEN PLACE)<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>`}
+        ${stop.role === 'stop' ? `<label class="field wide">WHEN DOES THE BASE RELEASE ITS HINT?<select id="ed-mode">${modeOptions}</select></label>` : ''}
+        ${stop.role === 'stop' ? `${field('ed-eq', 'ENTRY QUESTION (OPTIONAL, SHOWN AT THE BASE ONCE RELEASED; ITS ANSWER IS THE ENTRY FLAG)', stop.entryQuestion || '', 'wide')}${field('ed-ea', 'ENTRY FLAG (TYPED AT THE LOCATION TO UNLOCK IT; BLANK = UNLOCKS WHEN DISCOVERED)', stop.entryAnswer || '', 'wide')}` : ''}
         ${stop.role === 'stop' ? field('ed-exit', 'LOCATION CODE (shown when cleared; handed in at the base to unlock the NEXT location)', stop.exitFlag || '', 'wide') : ''}
         ${stop.role === 'stop' ? `<label class="field wide">NEXT CLUE (SHOWN WHEN THIS LOCATION IS CLEARED)<textarea id="ed-clue">${esc(stop.nextClue || '')}</textarea></label>` : ''}
       </div>
