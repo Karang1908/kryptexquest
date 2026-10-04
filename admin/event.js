@@ -1,5 +1,7 @@
 // The "Event" tab: start / pause / end, broadcast, quest area + no-go zones, help requests, standings, exports, data purge.
 import * as api from '../js/api.js';
+import { DEMO_STOPS } from '../js/data.js';
+import { distanceM } from '../js/geo.js';
 
 const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -22,12 +24,80 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
     E.zones = (E.game.noGo || []).map((z) => ({ ...z }));
     E.bounds = E.game.bounds ? { ...E.game.bounds } : null;
     renderStatus(); renderBroadcast(); renderSafety(); renderData();
+    renderReady();
     await refreshLive();
   }
 
   async function refreshLive() {
     try { E.help = await api.adminHelpRequests(); renderHelp(); } catch (error) { console.warn(error); }
     try { E.standings = await api.adminLeaderboard(); renderStandings(); } catch (error) { console.warn(error); }
+  }
+
+  // ---------- pre-event checklist ----------
+  const PRINTED_KEY = 'kq-admin-qr-printed';
+  const printed = () => { try { return JSON.parse(localStorage.getItem(PRINTED_KEY) || '{}'); } catch { return {}; } };
+  const MIN_REFS = 5;
+  /** Everything an organiser should be sure of before the doors open. level: bad (blocks play) | warn | ok */
+  function checks(stops, game) {
+    const out = [];
+    const add = (level, text) => out.push({ level, text });
+    const sample = new Map(DEMO_STOPS.map((d) => [d.id, d]));
+    const hub = stops.find((s) => s.role === 'hub');
+    const regular = stops.filter((s) => s.role === 'stop');
+    if (!hub) add('bad', 'No base (vending machine area) location exists. Players cannot check in.');
+    if (!regular.length) add('bad', 'No regular locations exist.');
+    const flags = new Map();
+    const seen = (flag, where) => { const k = String(flag || '').trim().toUpperCase(); if (k) flags.set(k, [...(flags.get(k) || []), where]); };
+    stops.forEach((s) => {
+      const label = s.place || s.id;
+      const d = sample.get(s.id);
+      if (d && Math.abs(d.lat - s.lat) < 1e-5 && Math.abs(d.lng - s.lng) < 1e-5) add('warn', `${label}: still at the provisional sample coordinates. Walk there and drag it into place.`);
+      if (s.role === 'stop') {
+        if (s.puzzles.length < 2) add('bad', `${label}: has ${s.puzzles.length} question${s.puzzles.length === 1 ? '' : 's'} (the plan is 2-3).`);
+        if (!String(s.exitFlag || '').trim()) add('bad', `${label}: no location code (handed in at the base).`);
+        if (!String(s.hint || '').trim()) add('warn', `${label}: no hint. The base shows nothing to find it by.`);
+        if (String(s.entryQuestion || '').trim() && !String(s.entryAnswer || '').trim()) add('bad', `${label}: has an entry question but no entry flag, so nobody can answer it.`);
+        if (!String(s.entryAnswer || '').trim()) add('warn', `${label}: no entry flag, so it unlocks the moment a team discovers it (out-of-order discoveries still stay locked).`);
+        seen(s.exitFlag, `${label} code`); seen(s.entryAnswer, `${label} entry flag`);
+      }
+      s.puzzles.forEach((p) => {
+        const q = `${label} Q${p.idx + 1}`;
+        if (!String(p.flag || '').trim()) add('bad', `${q}: no answer flag.`);
+        if (!String(p.prompt || '').trim()) add('bad', `${q}: no clue/prompt.`);
+        if (p.kind === 'photo') {
+          if (!String(p.question || '').trim()) add('bad', `${q}: photo question has no follow-up question text.`);
+          if ((p.refs || []).length < MIN_REFS) add((p.refs || []).length ? 'warn' : 'bad', `${q}: ${(p.refs || []).length} reference photos (aim for about 10; ${MIN_REFS}+ minimum).`);
+        }
+        seen(p.flag, q);
+      });
+    });
+    flags.forEach((where, flag) => { if (where.length > 1) add('warn', `Same flag ${flag} used in: ${where.join(', ')}.`); });
+    const sampleFlags = new Set(DEMO_STOPS.flatMap((d) => [d.exitFlag, d.entryAnswer, ...d.puzzles.map((p) => p.flag)]).filter(Boolean).map((f) => f.toUpperCase()));
+    const stillSample = [...flags.keys()].filter((f) => sampleFlags.has(f));
+    if (stillSample.length) add('warn', `${stillSample.length} flag${stillSample.length > 1 ? 's are' : ' is'} still a sample from the demo (${stillSample.slice(0, 3).join(', ')}…). Use real, secret flags.`);
+    for (let i = 0; i < stops.length; i += 1) for (let j = i + 1; j < stops.length; j += 1) {
+      const a = stops[i]; const b = stops[j];
+      if (a.role === 'bonus' || b.role === 'bonus') continue;
+      const gap = distanceM(a, b);
+      if (gap < a.radius + b.radius + 50) add('warn', `${a.place} and ${b.place} are only ${Math.round(gap)} m apart: walking into one can discover or unlock-range the other (radius ${a.radius} + ${b.radius} m + GPS slack).`);
+    }
+    const done = printed();
+    regular.concat(hub ? [hub] : []).forEach((s) => { if (!done[s.id]) add('warn', `${s.place}: QR code not marked as printed and posted (indoor GPS fallback).`); });
+    if (!game?.bounds) add('warn', 'No quest area set in the Safety panel (players could wander off campus).');
+    if (!out.some((c) => c.level === 'bad')) add('ok', 'No blockers found.');
+    return out;
+  }
+  async function renderReady() {
+    let stops;
+    try { stops = await api.adminContent(); } catch (error) { $('#evReady').innerHTML = '<h3>READY FOR THE EVENT?</h3><div class="empty">Could not load the content.</div>'; return; }
+    const list = checks(stops, E.game);
+    const bad = list.filter((c) => c.level === 'bad').length; const warn = list.filter((c) => c.level === 'warn').length;
+    const done = printed();
+    const qrRows = stops.filter((s) => s.role !== 'bonus').map((s) => `<label class="ready-row"><input type="checkbox" data-printed="${esc(s.id)}" ${done[s.id] ? 'checked' : ''} /> <span>${esc(s.place)}: QR printed &amp; posted</span></label>`).join('');
+    $('#evReady').innerHTML = `<h3>READY FOR THE EVENT?</h3>
+      <p class="ready-sum"><b style="color:${bad ? '#f28b82' : '#7fdc99'}">${bad} blocker${bad === 1 ? '' : 's'}</b> · <b style="color:#fdd663">${warn} warning${warn === 1 ? '' : 's'}</b> <button type="button" class="mini" id="evReadyRefresh">re-check</button></p>
+      <div class="ready-list">${list.map((c) => `<div class="ready-row ${c.level}"><span>${{ bad: '✕', warn: '⚠', ok: '✓' }[c.level]}</span><span>${esc(c.text)}</span></div>`).join('')}</div>
+      <details><summary class="hint">Tick off QR codes as you post them</summary><div class="ready-list">${qrRows}</div></details>`;
   }
 
   const statusLabel = { lobby: 'NOT STARTED', running: 'RUNNING', paused: 'PAUSED', ended: 'ENDED' };
@@ -44,7 +114,6 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
       <div class="form-grid">
         <label class="field">SCHEDULED START (OPTIONAL)<input type="datetime-local" id="evStart" value="${toLocalInput(g.startsAt)}" /></label>
         <label class="field">HARD END (OPTIONAL)<input type="datetime-local" id="evEnd" value="${toLocalInput(g.endsAt)}" /></label>
-        <label class="field">HINTS AT THE BASE<select id="evReveal"><option value="all" ${g.hubReveal === 'all' ? 'selected' : ''}>Show every location's hint after check-in</option><option value="progressive" ${g.hubReveal === 'progressive' ? 'selected' : ''}>Reveal a hint only after the previous location is cleared</option></select></label>
         <label class="field">PUBLIC BIG-SCREEN BOARD<select id="evBoard"><option value="false" ${!g.boardPublic ? 'selected' : ''}>Off</option><option value="true" ${g.boardPublic ? 'selected' : ''}>On (open /board/ on the projector)</option></select></label></div>
       <div class="btn-row"><button type="button" class="btn save" id="evSaveSchedule">Save schedule and options</button></div>
       <p class="hint">While the quest is not running, players can look around but check-ins, unlocks, photos and flags are refused. Starting requires teams to be locked in.</p>`;
@@ -109,7 +178,9 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
       if (status === 'ended' && !confirm('End the quest for everyone? Nobody can submit anything afterwards.')) return;
       return send({ status }, { running: 'The quest is running.', paused: 'Quest paused.', ended: 'Quest ended.', lobby: 'Back to the lobby.' }[status]);
     }
-    if (t.id === 'evSaveSchedule') return send({ startsAt: fromLocalInput($('#evStart').value), endsAt: fromLocalInput($('#evEnd').value), hubReveal: $('#evReveal').value, boardPublic: $('#evBoard').value === 'true' }, 'Saved.');
+    if (t.id === 'evSaveSchedule') return send({ startsAt: fromLocalInput($('#evStart').value), endsAt: fromLocalInput($('#evEnd').value), boardPublic: $('#evBoard').value === 'true' }, 'Saved.');
+    if (t.id === 'evReadyRefresh') return renderReady();
+    if (t.dataset?.printed) { const done = printed(); done[t.dataset.printed] = t.checked; try { localStorage.setItem(PRINTED_KEY, JSON.stringify(done)); } catch { /* optional */ } return; }
     if (t.id === 'evSend') {
       const result = await api.adminBroadcast($('#evMsg').value, $('#evTo').value || null, $('#evLevel').value);
       if (!result.ok) return toast(result.error);
