@@ -257,6 +257,7 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; margin: 0; letter-spacing
 .banner.announce.warn { border-color: var(--red); }
 .banner.announce span { flex: 1; }
 .banner.announce button { font-size: 18px; line-height: 1; color: var(--muted); }
+.banner.lock { border-color: var(--yellow); color: #ffd966; }
 .banner.safety { border-color: var(--red); color: #ff9d94; background: rgba(60, 14, 14, 0.92); }
 .compass-enable { top: calc(var(--safe-top) + 66px); }
 .game:has(.banners > :not([hidden])) .compass-enable { top: auto; bottom: calc(var(--safe-bottom) + 100px); }
