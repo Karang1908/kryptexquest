@@ -54,7 +54,7 @@ async function startConsole(who) {
   await initMap();
   wireContent();
   await refreshLive();
-  setInterval(refreshLive, 5000);
+  setInterval(refreshLive, 3000);
   setInterval(() => { if (A.tab === 'teams') refreshTeams(); if (A.tab === 'log' && $('#logLive').checked) loadEvents(true); }, 6000);
   refreshTeams();
 }
