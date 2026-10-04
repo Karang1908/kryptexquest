@@ -201,6 +201,44 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; margin: 0; letter-spacing
 .confetti i { position: absolute; top: -10px; width: 9px; height: 14px; border-radius: 2px; animation: fall 1.8s ease-in forwards; }
 @keyframes fall { to { transform: translate(var(--dx), 105vh) rotate(540deg); opacity: 0.9; } }
 
+/* ---------- peeking (finger on the map) ---------- */
+.player-dot { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--blue); border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(66, 133, 244, 0.3); opacity: 0; transition: opacity 0.25s; }
+.game.peeking .player-dot { opacity: 1; }
+.round-btn.attention { border-color: var(--blue); color: var(--blue); box-shadow: 0 0 0 4px rgba(66, 133, 244, 0.25); animation: nudge 1.4s ease-in-out infinite; }
+@keyframes nudge { 50% { box-shadow: 0 0 0 9px rgba(66, 133, 244, 0); } }
+.compass { display: grid; place-items: center; }
+.compass #compassNeedle { width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 20px solid var(--red); position: relative; transition: transform 0.1s linear; }
+.compass #compassNeedle::after { content: ''; position: absolute; left: -7px; top: 20px; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 20px solid #aab3cc; }
+.compass[aria-pressed='true'] { border-color: var(--yellow); }
+
+/* ---------- team screen ---------- */
+.team { display: grid; place-items: center; padding: 20px; background: radial-gradient(120% 80% at 50% 0%, #131b38 0%, var(--bg) 62%); overflow-y: auto; }
+.team-card { min-width: 0; width: min(100%, 400px); display: grid; gap: 14px; padding: 26px 22px; border-radius: 28px; background: rgba(14, 19, 34, 0.8); border: 1px solid var(--line); margin: auto; }
+.team-card > .eyebrow, .team-card > .login-fine { text-align: center; }
+.team-logo { width: 56px; height: 56px; margin: 0 auto; }
+.team-card h2 { font-size: 28px; text-align: center; }
+.team-card > div { display: grid; gap: 14px; }
+.team-copy, .team-status { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; text-align: center; }
+.team-form { display: grid; gap: 10px; }
+.team-input { width: 100%; padding: 15px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg); font-size: 16px; }
+.team-input:focus { outline: 2px solid var(--blue); border-color: transparent; }
+.team-input.code { font-family: 'Space Grotesk', monospace; letter-spacing: 0.4em; text-align: center; text-transform: uppercase; font-size: 22px; }
+.or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
+.or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.code-box { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 12px; padding: 14px 16px; border-radius: 18px; background: var(--surface-2); border: 1px dashed rgba(251, 188, 5, 0.5); }
+.code-box small { grid-column: 1; font-family: 'Space Grotesk', sans-serif; font-size: 9px; letter-spacing: 0.16em; color: var(--muted); }
+.code-box strong { grid-column: 1; font-family: 'Space Grotesk', monospace; font-size: clamp(22px, 7.5vw, 30px); letter-spacing: 0.2em; color: var(--yellow); user-select: all; -webkit-user-select: all; }
+.code-box .small-action { grid-column: 2; grid-row: 1 / span 2; padding: 12px 18px; background: var(--yellow); }
+.members { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.members li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); }
+.member-av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--blue); color: #fff; }
+.member-av.f { background: var(--red); }
+.member-name { flex: 1; font-weight: 600; }
+.member-name em { color: var(--muted); font-style: normal; font-weight: 400; }
+.badge { padding: 3px 8px; border-radius: 8px; font-family: 'Space Grotesk', sans-serif; font-size: 9px; letter-spacing: 0.12em; background: rgba(251, 188, 5, 0.16); color: var(--yellow); }
+.kick { width: 30px; height: 30px; border-radius: 50%; background: rgba(234, 67, 53, 0.16); color: #ff8b82; font-size: 18px; }
+.team .primary-button:disabled { background: var(--surface-2); box-shadow: none; color: var(--muted); }
+
 /* ---------- larger screens: keep the phone-shaped experience centred ---------- */
 @media (min-width: 720px) {
   .game { left: 50%; width: 480px; margin-left: -240px; border-inline: 1px solid var(--line); }
