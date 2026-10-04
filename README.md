@@ -1,0 +1,2 @@
+in gdg = good boi
+not in gdg = bad boi
