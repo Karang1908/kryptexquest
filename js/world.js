@@ -26,6 +26,9 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
   map.addSource('accuracy', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'accuracy-line', type: 'line', source: 'accuracy', paint: { 'line-color': '#4285F4', 'line-opacity': 0.35, 'line-width': 1.5 } }, 'scene3d');
 
+  // Teammates: a coloured dot with a name, updated from the location ping. The marker's own element is only positioned;
+  // the visuals live on a child (MapLibre owns the marker element's transform).
+  const mateMarkers = new Map();
   const labelsEl = document.getElementById('stopLabels');
   const labels = new Map();
   let stops = [];
@@ -57,9 +60,8 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
 
   function stopState(stop) {
     const status = statuses[stop.id] || 'open';
-    const near = target && distanceM(target, stop) <= (stop.radius || CONFIG.defaultRadiusM);
-    if (status === 'hub') return near ? 'near' : 'hub';
-    return status === 'cleared' ? 'cleared' : status === 'locked' ? 'locked' : near ? 'near' : 'open';
+    // grey = discovered but locked, blue = unlocked and being solved, green = cleared, red = the base
+    return status;
   }
 
   function layoutLabels() {
@@ -218,6 +220,23 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
         anchor = { lat: fix.lat, lng: fix.lng, at: nowMs, mps: Math.min(d / secs, 6) };
         moveUntil = nowMs + 3500;
       }
+    },
+    setMates(list) {
+      const seen = new Set();
+      list.forEach((m) => {
+        seen.add(m.id);
+        let marker = mateMarkers.get(m.id);
+        if (!marker) {
+          const wrap = document.createElement('div');
+          const pin = document.createElement('div'); pin.className = 'mate-pin';
+          pin.innerHTML = '<i class="mate-dot"></i><span class="mate-name"></span>';
+          pin.querySelector('.mate-name').textContent = m.name;
+          wrap.append(pin);
+          marker = new maplibregl.Marker({ element: wrap, anchor: 'center' }).setLngLat([m.lng, m.lat]).addTo(map);
+          mateMarkers.set(m.id, marker);
+        } else marker.setLngLat([m.lng, m.lat]);
+      });
+      mateMarkers.forEach((marker, id) => { if (!seen.has(id)) { marker.remove(); mateMarkers.delete(id); } });
     },
     shownPosition: () => shown || target,
     bearing: () => camBearing,
