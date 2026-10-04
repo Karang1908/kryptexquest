@@ -1,3 +1,6 @@
 .DS_Store
 *.swp
 *.log
+supabase/seed.local.sql
+supabase/.temp/
+supabase/.branches/
