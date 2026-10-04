@@ -3,21 +3,23 @@
 //
 // The game, as organisers described it:
 //  - A base ("hub", the vending machine area) shows every location with a hint. Teams check in there to start.
-//  - A location is entered with a flag: either the previous location's handoff flag typed at the location (entryMode
-//    'chain'), or the answer to a basic question answered at the base (entryMode 'hub').
+//  - Locations unlock by walking into them, in order: entryMode 'chain' = the previous location's code has been handed in
+//    at the base (the first one: after check-in). 'hub' = unlocked by answering a basic question at the base. 'open' = always.
+//    Locked locations stay on the map as greyed beacons.
 //  - Each location has 2-3 puzzles. A photo puzzle shows a clue ("find the object that ..."); photograph it and the real
 //    question appears; its answer is a flag. A flag puzzle shows its question directly.
-//  - Clearing a location reveals its handoff flag + a clue. Hand all flags in at the base to unlock the bonus location.
+//  - Clearing a location reveals its code + a clue. Hand each code in at the base: that finishes the quest when all are in,
+//    and shows a bonus question screen (role 'bonus', needs no location).
 export const DEMO_STOPS = [
   {
     id: 'base', ord: 0, role: 'hub', entryMode: 'open', name: 'Base Camp', place: 'Vending Machine Area', label: 'BASE', type: 'hub', icon: '⌂',
-    lat: 25.13126, lng: 55.4188, radius: 30, description: 'Start here. Check in, read the hints, and hand in the flags you collect.',
+    lat: 25.1306, lng: 55.418, radius: 30, description: 'Start here. Check in, read the hints, and hand in the flags you collect.',
     hint: '', entryQuestion: null, entryAnswer: null, qrToken: 'demobase', exitFlag: null, nextClue: null, puzzles: [],
   },
   {
-    id: 'lobby', ord: 1, role: 'stop', entryMode: 'hub', name: 'The Arrival', place: 'Main Lobby', label: '01 / WELCOME', type: 'lobby', icon: '✳',
+    id: 'lobby', ord: 1, role: 'stop', entryMode: 'chain', name: 'The Arrival', place: 'Main Lobby', label: '01 / WELCOME', type: 'lobby', icon: '✳',
     lat: 25.13111, lng: 55.41864, radius: 50, description: 'Where every campus story begins.',
-    hint: 'Where every visitor first walks in.', entryQuestion: 'Demo: the base question. Type KQ{CHIPS} to unlock this location.', entryAnswer: 'KQ{CHIPS}', qrToken: 'demolobby',
+    hint: 'Where every visitor first walks in.', entryQuestion: null, entryAnswer: null, qrToken: 'demolobby',
     exitFlag: 'KQ{OPEN_BOOK}', nextClue: 'A place where you study, search, and get lost in stories.',
     puzzles: [
       { title: 'Emergency eyes', kind: 'photo', prompt: 'Find the red device used to alert people in an emergency.', question: 'Photo verified. Demo question: type KQ{ALARM}.', flag: 'KQ{ALARM}' },
@@ -56,12 +58,12 @@ export const DEMO_STOPS = [
     ],
   },
   {
-    id: 'vault', ord: 5, role: 'bonus', entryMode: 'open', name: 'The Vault', place: 'Kryptex Vault', label: 'BONUS', type: 'bonus', icon: '★',
-    lat: 25.1319, lng: 55.41905, radius: 40, description: 'The bonus location: only for teams that brought every flag home.',
-    hint: 'Only revealed once every flag is handed in at the base.', entryQuestion: null, entryAnswer: null, qrToken: 'demovault',
-    exitFlag: 'KQ{KRYPTEX_FOUND}', nextClue: 'You found the Kryptex.',
+    id: 'vault', ord: 5, role: 'bonus', entryMode: 'open', name: 'Bonus Question', place: 'The Kryptex Vault', label: 'BONUS', type: 'bonus', icon: '★',
+    lat: 25.1319, lng: 55.41905, radius: 40, description: 'An extra question for teams that found every location. Answer it from anywhere.',
+    hint: 'Revealed once every code is handed in at the base.', entryQuestion: null, entryAnswer: null, qrToken: 'demovault',
+    exitFlag: null, nextClue: null,
     puzzles: [
-      { title: 'Kryptex found', kind: 'flag', prompt: 'Demo question: type KQ{FOUND_IT} to finish the quest.', flag: 'KQ{FOUND_IT}' },
+      { title: 'Kryptex found', kind: 'flag', prompt: 'Demo bonus question: type KQ{FOUND_IT}.', flag: 'KQ{FOUND_IT}' },
     ],
   },
 ];
