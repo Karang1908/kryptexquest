@@ -43,6 +43,39 @@
       </div>
     </section>
 
+    <!-- Team -->
+    <section id="teamScreen" class="screen team" aria-label="Your team" hidden>
+      <div class="team-card">
+        <svg class="team-logo" aria-hidden="true"><use href="#kq-logo" /></svg>
+        <span class="eyebrow">YOUR SQUAD</span>
+        <div id="teamStart">
+          <h2>Form your team</h2>
+          <p class="team-copy">Quest teams have 2 to 4 players. One of you creates the team and shares the code in person; the rest enter it.</p>
+          <form id="createForm" class="team-form">
+            <input name="team" class="team-input" maxlength="24" autocomplete="off" placeholder="Team name" aria-label="Team name" required />
+            <button class="primary-button" type="submit">Create a team</button>
+          </form>
+          <div class="or"><span>or</span></div>
+          <form id="joinForm" class="team-form">
+            <input name="code" class="team-input code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Team code" required />
+            <button class="ghost-button" type="submit">Join with a code</button>
+          </form>
+        </div>
+        <div id="teamLobby" hidden>
+          <h2 id="teamNameOut">Team</h2>
+          <div class="code-box"><small>TEAM CODE</small><strong id="teamCode">------</strong><button type="button" id="teamShare" class="small-action">Share</button></div>
+          <div class="progress"><span>PLAYERS</span><b id="teamCount">1 / 4</b></div>
+          <ul id="teamMembers" class="members"></ul>
+          <p id="teamStatus" class="team-status"></p>
+          <button class="primary-button" id="teamLock" type="button">Lock in team</button>
+          <button class="ghost-button" id="teamDemoMate" type="button" hidden>Demo: add a teammate</button>
+          <button class="ghost-button" id="teamLeave" type="button">Leave team</button>
+          <button class="primary-button" id="teamBack" type="button" hidden>Back to the map</button>
+        </div>
+        <p class="login-fine">While you play, organisers can see your live location.</p>
+      </div>
+    </section>
+
     <!-- Game -->
     <main id="game" class="game" hidden>
       <div id="map" class="map-canvas" aria-label="Interactive campus map"></div>
@@ -61,7 +94,7 @@
 
       <div class="side-tools">
         <button class="round-btn" id="recenterButton" type="button" aria-label="Recenter on me">⌖</button>
-        <button class="round-btn" id="exploreButton" type="button" aria-label="Look around the campus">◫</button>
+        <button class="round-btn compass" id="compassButton" type="button" aria-label="Lock north up" aria-pressed="false"><span id="compassNeedle" aria-hidden="true"></span></button>
       </div>
 
       <button class="near-card" id="nearCard" type="button" hidden>
@@ -116,6 +149,7 @@
         <p class="dialog-note" id="menuEmail"></p>
         <div class="menu-list">
           <button type="button" data-menu="avatar">Change character</button>
+          <button type="button" data-menu="team">My team</button>
           <button type="button" data-menu="help">How to play</button>
           <label class="menu-toggle" id="simToggleRow" hidden><span>Walking simulator <small>Testing off campus</small></span><input type="checkbox" id="simToggle" /></label>
           <button type="button" data-menu="reset" id="resetRow" hidden>Reset demo progress</button>
@@ -131,7 +165,8 @@
         <span class="eyebrow">FIELD GUIDE</span>
         <h2>How the quest works</h2>
         <ol class="guide-list">
-          <li><b>Walk to a glowing stop.</b><span>Your explorer follows your real GPS position.</span></li>
+          <li><b>Team up.</b><span>2 to 4 players. One creates the team, the rest join with its code, then the leader locks it in.</span></li>
+          <li><b>Walk to a glowing stop.</b><span>Your explorer follows your real GPS position. Drag the map to look around.</span></li>
           <li><b>Unlock it.</b><span>Enter the handoff flag from the previous location.</span></li>
           <li><b>Solve three puzzles.</b><span>Enter flags, or photograph the real object that's described.</span></li>
           <li><b>Follow the clue.</b><span>Three solves reveal the next clue and its password.</span></li>
