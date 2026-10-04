@@ -66,6 +66,7 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; margin: 0; letter-spacing
 .beacon-label[data-state='locked'] { --c: #6b7390; color: var(--muted); }
 .beacon-label[data-state='near'] { --c: var(--yellow); }
 .beacon-label[data-state='cleared'] { --c: var(--green); }
+.beacon-label[data-state='hub'] { --c: var(--red); }
 .beacon-label.selected { transform-origin: bottom center; }
 
 /* ---------- HUD ---------- */
@@ -246,3 +247,48 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; margin: 0; letter-spacing
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- banners ---------- */
+.banners { position: absolute; z-index: 7; left: 12px; right: 12px; top: calc(var(--safe-top) + 70px); display: grid; gap: 8px; pointer-events: none; }
+.banner { pointer-events: auto; padding: 10px 14px; border-radius: 14px; font-size: 13px; font-weight: 600; line-height: 1.4; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--line); background: rgba(14, 19, 34, 0.9); }
+.banner.status { border-color: var(--yellow); color: var(--yellow); }
+.banner.status button { margin-left: 8px; color: var(--text); text-decoration: underline; font-weight: 700; }
+.banner.announce { display: flex; gap: 10px; align-items: flex-start; border-color: var(--blue); }
+.banner.announce.warn { border-color: var(--red); }
+.banner.announce span { flex: 1; }
+.banner.announce button { font-size: 18px; line-height: 1; color: var(--muted); }
+.banner.safety { border-color: var(--red); color: #ff9d94; background: rgba(60, 14, 14, 0.92); }
+.compass-enable { top: calc(var(--safe-top) + 66px); }
+.game:has(.banners > :not([hidden])) .compass-enable { top: auto; bottom: calc(var(--safe-bottom) + 100px); }
+
+/* ---------- base (hub) sheet ---------- */
+.stop-card { margin-bottom: 10px; padding: 14px; border-radius: 18px; background: var(--surface-2); border: 1px solid var(--line); display: grid; gap: 8px; }
+.stop-card.cleared { border-color: rgba(52, 168, 83, 0.5); }
+.stop-card.open { border-color: rgba(66, 133, 244, 0.6); }
+.stop-card .loc-head { display: flex; align-items: center; gap: 10px; }
+.stop-card .loc-head strong { flex: 1; }
+.loc-num { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: rgba(66, 133, 244, 0.18); color: var(--blue); font-weight: 700; font-size: 13px; }
+.stop-card.cleared .loc-num { background: var(--green); color: #06150b; }
+.chip-s { padding: 3px 8px; border-radius: 8px; font-family: 'Space Grotesk', sans-serif; font-size: 9px; letter-spacing: 0.12em; background: var(--bg); color: var(--muted); }
+.stop-card.open .chip-s { color: var(--blue); }
+.stop-card.cleared .chip-s { color: #7fdc99; }
+.loc-hint { margin: 0; color: #cdd3e4; font-size: 14px; line-height: 1.5; }
+.loc-note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.handin { padding: 16px; border-radius: 20px; background: var(--surface-2); border: 1px dashed rgba(251, 188, 5, 0.5); display: grid; gap: 10px; }
+.handin h3 { font-size: 16px; }
+.handed { display: flex; flex-wrap: wrap; gap: 6px; }
+.handed span { padding: 4px 10px; border-radius: 10px; background: rgba(52, 168, 83, 0.15); color: #7fdc99; font-size: 12px; font-weight: 600; }
+.section-title { font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: 0.14em; color: var(--muted); margin: 6px 0 -2px; }
+.clue-line { color: #ffd966 !important; }
+.tick-tag { display: inline-block; margin-bottom: 6px; padding: 3px 8px; border-radius: 8px; background: rgba(52, 168, 83, 0.15); color: #7fdc99; font-size: 11px; font-weight: 700; }
+.finished-box { padding: 14px; border-radius: 18px; background: rgba(251, 188, 5, 0.12); border: 1px solid var(--yellow); font-weight: 700; color: var(--yellow); text-align: center; }
+
+/* ---------- leaderboard ---------- */
+.board-body { display: grid; gap: 6px; max-height: 55vh; overflow-y: auto; }
+.board-row { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); }
+.board-row.me { border: 1px solid var(--blue); }
+.board-row .pos { font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: var(--muted); }
+.board-row:nth-child(-n+3) .pos { color: var(--yellow); }
+.board-row small { color: var(--muted); display: block; font-size: 11px; }
+.board-row .time { font-family: 'Space Grotesk', sans-serif; font-weight: 700; text-align: right; }
+.menu-list .danger { color: #ff8b82; }
