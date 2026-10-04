@@ -2,14 +2,16 @@
 // Stop coordinates are provisional, not surveyed.
 //
 // The game, as organisers described it:
-//  - A base ("hub", the vending machine area) shows every location with a hint. Teams check in there to start.
-//  - Locations unlock by walking into them, in order: entryMode 'chain' = the previous location's code has been handed in
-//    at the base (the first one: after check-in). 'hub' = unlocked by answering a basic question at the base. 'open' = always.
-//    Locked locations stay on the map as greyed beacons.
-//  - Each location has 2-3 puzzles. A photo puzzle shows a clue ("find the object that ..."); photograph it and the real
-//    question appears; its answer is a flag. A flag puzzle shows its question directly.
-//  - Clearing a location reveals its code + a clue. Hand each code in at the base: that finishes the quest when all are in,
-//    and shows a bonus question screen (role 'bonus', needs no location).
+//  - Locations are HIDDEN. A team discovers one by walking into its radius ("Location discovered"); it then stays on that
+//    team's map: grey while locked, blue while unlocked, green once cleared.
+//  - A base ("hub", the vending machine area) is where teams check in and hand in codes. Handing in the previous location's
+//    code releases the next location's hint + entry question there (entryMode 'chain'; 'open' = released after check-in).
+//  - The answer to the entry question is the location's ENTRY FLAG: type it at the (discovered) location to unlock it.
+//    With no question set, the base shows the entry flag itself. With no entry flag, discovering it unlocks it.
+//  - Each location has 2-3 puzzles. A photo puzzle shows a clue; photograph the object and the real question appears;
+//    its answer is a flag. A flag puzzle shows its question directly.
+//  - Clearing a location reveals its CODE. Hand it in at the base: that releases the next location, and when every code is in
+//    the quest is finished and a bonus question appears (role 'bonus', needs no location).
 export const DEMO_STOPS = [
   {
     id: 'base', ord: 0, role: 'hub', entryMode: 'open', name: 'Base Camp', place: 'Vending Machine Area', label: 'BASE', type: 'hub', icon: '⌂',
@@ -19,7 +21,7 @@ export const DEMO_STOPS = [
   {
     id: 'lobby', ord: 1, role: 'stop', entryMode: 'chain', name: 'The Arrival', place: 'Main Lobby', label: '01 / WELCOME', type: 'lobby', icon: '✳',
     lat: 25.13111, lng: 55.41864, radius: 50, description: 'Where every campus story begins.',
-    hint: 'Where every visitor first walks in.', entryQuestion: null, entryAnswer: null, qrToken: 'demolobby',
+    hint: 'Where every visitor first walks in.', entryQuestion: 'Demo: what unlocks the first location? Type KQ{ENTER_LOBBY}.', entryAnswer: 'KQ{ENTER_LOBBY}', qrToken: 'demolobby',
     exitFlag: 'KQ{OPEN_BOOK}', nextClue: 'A place where you study, search, and get lost in stories.',
     puzzles: [
       { title: 'Emergency eyes', kind: 'photo', prompt: 'Find the red device used to alert people in an emergency.', question: 'Photo verified. Demo question: type KQ{ALARM}.', flag: 'KQ{ALARM}' },
@@ -29,8 +31,8 @@ export const DEMO_STOPS = [
   },
   {
     id: 'library', ord: 2, role: 'stop', entryMode: 'chain', name: 'Between the Lines', place: 'Library', label: '02 / KNOWLEDGE', type: 'library', icon: '⌘',
-    lat: 25.13152, lng: 55.41886, radius: 50, description: 'Quiet shelves. Loud secrets.',
-    hint: 'Where books stand shoulder to shoulder.', entryQuestion: null, entryAnswer: null, qrToken: 'demolibrary',
+    lat: 25.1323, lng: 55.4184, radius: 50, description: 'Quiet shelves. Loud secrets.',
+    hint: 'Where books stand shoulder to shoulder.', entryQuestion: 'Demo: type KQ{ENTER_LIBRARY} to unlock the library.', entryAnswer: 'KQ{ENTER_LIBRARY}', qrToken: 'demolibrary',
     exitFlag: 'KQ{BUILD_IDEA}', nextClue: 'Where hands and tools turn ideas into things.',
     puzzles: [
       { title: 'Study light', kind: 'photo', prompt: 'Find the object used to light a study desk.', question: 'Photo verified. Demo question: type KQ{BRIGHT_MIND}.', flag: 'KQ{BRIGHT_MIND}' },
@@ -40,7 +42,7 @@ export const DEMO_STOPS = [
   {
     id: 'lab', ord: 3, role: 'stop', entryMode: 'chain', name: 'Maker Mode', place: 'Academic Block', label: '03 / DISCOVERY', type: 'lab', icon: '⚙',
     lat: 25.1317, lng: 55.41946, radius: 50, description: 'Where experiments take shape.',
-    hint: 'Where experiments take shape.', entryQuestion: null, entryAnswer: null, qrToken: 'demolab',
+    hint: 'Where experiments take shape.', entryQuestion: 'Demo: type KQ{ENTER_LAB}.', entryAnswer: 'KQ{ENTER_LAB}', qrToken: 'demolab',
     exitFlag: 'KQ{GREEN_SIGNAL}', nextClue: 'Go where the campus opens up to the sky.',
     puzzles: [
       { title: 'Safety first', kind: 'photo', prompt: 'Find a clearly marked exit or safety sign.', question: 'Photo verified. Demo question: type KQ{SAFE_ROUTE}.', flag: 'KQ{SAFE_ROUTE}' },
@@ -49,8 +51,8 @@ export const DEMO_STOPS = [
   },
   {
     id: 'courtyard', ord: 4, role: 'stop', entryMode: 'chain', name: 'Final Frequency', place: 'Campus Courtyard', label: '04 / OPEN AIR', type: 'courtyard', icon: '◆',
-    lat: 25.1309, lng: 55.41933, radius: 50, description: 'The trail runs out into the open.',
-    hint: 'Where the campus opens up to the sky.', entryQuestion: null, entryAnswer: null, qrToken: 'democourtyard',
+    lat: 25.1305, lng: 55.42, radius: 50, description: 'The trail runs out into the open.',
+    hint: 'Where the campus opens up to the sky.', entryQuestion: null, entryAnswer: 'KQ{ENTER_YARD}', qrToken: 'democourtyard',
     exitFlag: 'KQ{QUEST_CLEAR}', nextClue: 'Return to the base with every flag you found.',
     puzzles: [
       { title: 'Living clue', kind: 'photo', prompt: 'Find a tree or planted greenery.', question: 'Photo verified. Demo question: type KQ{ROOTED}.', flag: 'KQ{ROOTED}' },
