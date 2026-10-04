@@ -1,93 +1,67 @@
 import { CONFIG } from './config.js';
 import { distanceM, bearingDeg } from './geo.js';
-import { loadMapLibre, buildStyle, whenLoaded, circlePolygon, stopMarkerElement } from './map-core.js';
+import { loadMapLibre, buildStyle, whenLoaded, circlePolygon } from './map-core.js';
+import { createScene3D } from './scene3d.js';
 
 const ANIM = { idle: 'CharacterArmature|Idle', walk: 'CharacterArmature|Walk', run: 'CharacterArmature|Run' };
-const CAMERA = { zoom: 19.4, pitch: 67 };          // third-person: low, tilted, close to the explorer
-const PEEK_RETURN_MS = 8000;                        // snap back to the explorer after this long without touching the map
+// Pokémon GO camera: low, tilted far enough to show the horizon, wide field of view, explorer dead centre.
+const CAMERA = { zoom: 18.6, pitch: 66, fov: 58 };
+const LABEL_RANGE_M = 260;
 const shortestAngle = (from, to) => ((to - from + 540) % 360) - 180;
 
-export async function createWorld({ onStopTap, onPeekChange }) {
+export async function createWorld({ onStopTap }) {
   const maplibregl = await loadMapLibre();
   const map = new maplibregl.Map({
     container: 'map', style: await buildStyle(), center: [CONFIG.campus.lng, CONFIG.campus.lat],
-    zoom: CAMERA.zoom, pitch: CAMERA.pitch, bearing: 0, minZoom: 16.5, maxZoom: 21, maxPitch: 75,
-    attributionControl: { compact: true },
+    zoom: CAMERA.zoom, pitch: CAMERA.pitch, bearing: 0, minZoom: 17, maxZoom: 20.5, maxPitch: 85,
+    attributionControl: { compact: true }, interactive: false,
   });
   await whenLoaded(map);
+  map.setVerticalFieldOfView(CAMERA.fov);
 
-  const game = document.getElementById('game');
-  const avatarEl = document.getElementById('playerAvatar');
-  const stage = document.querySelector('.player-stage');
-
-  // The ring lives under the explorer's feet; its centre dot only shows while you look around the map.
-  // The pulse animates a child because MapLibre owns the marker element's own transform.
-  const ringEl = document.createElement('div');
-  ringEl.innerHTML = '<div class="player-ring"></div><div class="player-dot"></div>';
-  const ring = new maplibregl.Marker({ element: ringEl, pitchAlignment: 'map', rotationAlignment: 'map' })
-    .setLngLat([CONFIG.campus.lng, CONFIG.campus.lat]).addTo(map);
+  const scene3d = await createScene3D(maplibregl);
+  map.addLayer(scene3d.layer);
 
   map.addSource('accuracy', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  map.addLayer({ id: 'accuracy-fill', type: 'fill', source: 'accuracy', paint: { 'fill-color': '#4285F4', 'fill-opacity': 0.12 } });
-  map.addLayer({ id: 'accuracy-line', type: 'line', source: 'accuracy', paint: { 'line-color': '#4285F4', 'line-opacity': 0.5, 'line-width': 1.5 } });
+  map.addLayer({ id: 'accuracy-line', type: 'line', source: 'accuracy', paint: { 'line-color': '#4285F4', 'line-opacity': 0.35, 'line-width': 1.5 } }, 'scene3d');
+
+  const labelsEl = document.getElementById('stopLabels');
+  const labels = new Map();
+  let stops = [];
+  let statuses = {};
+  let selectedId = null;
 
   let target = null;          // latest fix
   let shown = null;           // smoothed on-screen position
   let heading = 0;            // direction of travel, degrees from north
-  let camBearing = 0;         // map rotation; follows heading so the explorer always walks "up" the screen
+  let camBearing = 0;         // map rotation: follows heading so the explorer walks "up" the screen
   let northUp = false;
   let speed = 0;
   let anim = '';
-  let following = true;
-  let easing = false;
-  let touching = false;       // a finger is down on the map: stop steering the camera so the drag can start
-  let peekTimer = null;
   let last = performance.now();
-  let modelReady = avatarEl.loaded === true; // the model may have finished loading before the world existed
-  let appliedYaw = null;
-  const markers = new Map();
-
-  avatarEl.addEventListener('load', () => { modelReady = true; appliedYaw = null; });
-  avatarEl.addEventListener('error', () => { modelReady = false; });
 
   function setAnim(name) {
     if (anim === name) return;
     anim = name;
-    avatarEl.setAttribute('animation-name', name);
+    scene3d.setAnimation(name);
   }
 
-  function lockGestures(follow) {
-    // Dragging is always on: the first drag is what switches to look-around. Rotation and tilt only unlock then,
-    // because while following the camera owns them.
-    map.dragPan.enable();
-    if (follow) { map.touchZoomRotate.disableRotation(); map.touchPitch.disable(); map.dragRotate.disable(); }
-    else { map.touchZoomRotate.enableRotation(); map.touchPitch.enable(); map.dragRotate.enable(); }
+  function stopState(stop) {
+    const status = statuses[stop.id] || 'open';
+    const near = target && distanceM(target, stop) <= (stop.radius || CONFIG.defaultRadiusM);
+    return status === 'cleared' ? 'cleared' : status === 'locked' ? 'locked' : near ? 'near' : 'open';
   }
-  lockGestures(true);
-  map.scrollZoom.enable();
-  map.keyboard.disable();
 
-  function enterPeek() {
-    if (!following && !easing) return;
-    following = false; easing = false;
-    clearTimeout(peekTimer);
-    game.classList.add('peeking');
-    stage.classList.add('hidden');
-    lockGestures(false);
-    onPeekChange?.(true);
+  function layoutLabels() {
+    const placed = new Map(scene3d.beaconScreen().map((b) => [b.id, b]));
+    labels.forEach((el, id) => {
+      const b = placed.get(id);
+      const visible = b?.visible && b.dist < LABEL_RANGE_M && b.x > -60 && b.x < innerWidth + 60;
+      el.style.opacity = visible ? String(Math.max(0.35, 1 - b.dist / LABEL_RANGE_M)) : '0';
+      el.style.pointerEvents = visible ? 'auto' : 'none';
+      if (visible) el.style.transform = `translate(${b.x}px, ${b.y}px) translate(-50%, -100%) translateY(-30px) scale(${Math.min(1.15, Math.max(0.6, 160 / (b.dist + 60)))})`;
+    });
   }
-  function armPeekReturn() {
-    clearTimeout(peekTimer);
-    peekTimer = setTimeout(() => api.recenter(), PEEK_RETURN_MS);
-  }
-  // jumpTo() cancels an in-flight gesture, so the camera must let go while a finger is down.
-  ['mousedown', 'touchstart'].forEach((name) => map.on(name, () => { touching = true; }));
-  ['mouseup', 'touchend', 'touchcancel'].forEach((name) => map.on(name, () => { touching = false; }));
-  // Putting a finger on the map leaves follow mode. Zooming alone does not.
-  map.on('dragstart', (e) => { if (e.originalEvent) { enterPeek(); armPeekReturn(); } });
-  map.on('rotatestart', (e) => { if (e.originalEvent && following) { enterPeek(); armPeekReturn(); } });
-  map.on('pitchstart', (e) => { if (e.originalEvent && following) { enterPeek(); armPeekReturn(); } });
-  map.on('moveend', (e) => { if (e.originalEvent && !following) armPeekReturn(); });
 
   function frame(now) {
     requestAnimationFrame(frame);
@@ -111,44 +85,48 @@ export async function createWorld({ onStopTap, onPeekChange }) {
     else if (speed > 0.45) setAnim(ANIM.walk);
     else if (speed < 0.2) setAnim(ANIM.idle);
 
-    // Third person: turn the world, not the explorer. Only while actually moving, and slowly, to avoid whiplash.
+    // Third person: the camera swings in behind the explorer, slowly and only while walking, to avoid whiplash.
     if (northUp) camBearing += shortestAngle(camBearing, 0) * (1 - Math.exp(-dt / 0.5));
-    else if (speed > 0.6) camBearing += shortestAngle(camBearing, heading) * (1 - Math.exp(-dt / 0.9));
+    else if (speed > 0.6) camBearing += shortestAngle(camBearing, heading) * (1 - Math.exp(-dt / 1.1));
     camBearing = (camBearing + 360) % 360;
 
-    // Seen from behind. With north-up (or while the camera catches up) the explorer visibly turns instead.
-    // model-viewer 4.3.1 throws from its `orientation` setter, so turn the camera around the model.
-    const facing = heading - camBearing;
-    const yaw = Math.round(180 + facing + 360) % 360;
-    if (modelReady && yaw !== appliedYaw) { appliedYaw = yaw; avatarEl.setAttribute('camera-orbit', `${yaw}deg 78deg 4.2m`); }
-
-    ring.setLngLat([shown.lng, shown.lat]);
-    if (following && !easing && !touching) map.jumpTo({ center: [shown.lng, shown.lat], bearing: camBearing });
+    scene3d.update({ origin: shown, heading, bearing: camBearing });
+    map.jumpTo({ center: [shown.lng, shown.lat], bearing: camBearing });
+    layoutLabels();
   }
   requestAnimationFrame(frame);
 
-  function stopState(stop, status) {
-    const near = target && distanceM(target, stop) <= (stop.radius || CONFIG.defaultRadiusM);
-    return status === 'cleared' ? 'cleared' : status === 'locked' ? 'locked' : near ? 'near' : 'open';
-  }
+  // Tapping a floating beacon opens that stop. (The map itself is not draggable; this is a game camera.)
+  map.getCanvas().addEventListener('click', (event) => {
+    const rect = map.getCanvas().getBoundingClientRect();
+    const x = event.clientX - rect.left; const y = event.clientY - rect.top;
+    const hit = scene3d.beaconScreen().filter((b) => b.visible).map((b) => ({ ...b, d: Math.hypot(b.x - x, b.y - y) })).sort((a, b) => a.d - b.d)[0];
+    if (hit && hit.d < 70) onStopTap(hit.id);
+  });
 
-  const api = {
+  return {
     map,
-    setStops(stops) {
-      markers.forEach(({ marker }) => marker.remove());
-      markers.clear();
-      stops.forEach((stop) => {
-        const el = stopMarkerElement(stop);
-        el.addEventListener('click', (event) => { event.stopPropagation(); onStopTap(stop.id); });
-        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([stop.lng, stop.lat]).addTo(map);
-        markers.set(stop.id, { stop, el, marker });
+    setStops(next) {
+      stops = next;
+      scene3d.setStops(next);
+      labels.forEach((el) => el.remove()); labels.clear();
+      next.forEach((stop) => {
+        const el = document.createElement('button');
+        el.type = 'button'; el.className = 'beacon-label';
+        el.innerHTML = '<span class="bl-icon"></span><span class="bl-name"></span>';
+        el.querySelector('.bl-icon').textContent = stop.icon;
+        el.querySelector('.bl-name').textContent = stop.place;
+        el.addEventListener('click', (e) => { e.stopPropagation(); onStopTap(stop.id); });
+        labelsEl.append(el);
+        labels.set(stop.id, el);
       });
     },
     /** statuses: { stopId: 'locked' | 'open' | 'cleared' } */
-    refreshStops(statuses, selectedId) {
-      markers.forEach(({ stop, el }) => {
-        el.className = `stop-marker ${stopState(stop, statuses[stop.id])}${selectedId === stop.id ? ' selected' : ''}`;
-      });
+    refreshStops(next, selected) {
+      statuses = next; selectedId = selected;
+      const resolved = Object.fromEntries(stops.map((s) => [s.id, stopState(s)]));
+      scene3d.setStatuses(resolved, selectedId);
+      labels.forEach((el, id) => { el.dataset.state = resolved[id]; el.classList.toggle('selected', id === selectedId); });
     },
     setFix(fix) {
       target = fix;
@@ -158,30 +136,8 @@ export async function createWorld({ onStopTap, onPeekChange }) {
     shownPosition: () => shown || target,
     bearing: () => camBearing,
     isMoving: () => speed > 0.45,
-    setAvatar(kind) {
-      const src = `./assets/player-${kind}.glb`;
-      if (avatarEl.getAttribute('src') !== src) { modelReady = false; avatarEl.setAttribute('src', src); }
-      avatarEl.setAttribute('alt', `${kind === 'female' ? 'Female' : 'Male'} adventurer`);
-    },
+    setAvatar(kind) { return scene3d.setAvatarKind(kind); },
     setNorthUp(on) { northUp = on; },
     isNorthUp: () => northUp,
-    isPeeking: () => !following,
-    /** Fly the camera back behind the explorer. */
-    recenter() {
-      clearTimeout(peekTimer);
-      if (following && !easing) return;
-      easing = true;
-      const done = () => {
-        easing = false; following = true;
-        game.classList.remove('peeking');
-        stage.classList.remove('hidden');
-        lockGestures(true);
-        onPeekChange?.(false);
-      };
-      map.once('moveend', done);
-      const here = shown || target || CONFIG.campus;
-      map.easeTo({ center: [here.lng, here.lat], bearing: camBearing, pitch: CAMERA.pitch, zoom: CAMERA.zoom, duration: 700, essential: true });
-    },
   };
-  return api;
 }
