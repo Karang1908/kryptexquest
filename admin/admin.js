@@ -9,12 +9,12 @@ const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const COLORS = ['#4285F4', '#EA4335', '#FBBC05', '#34A853'];
 const ONLINE_MS = 90_000;
-const KIND_LABEL = { team_created: 'Team created', team_joined: 'Joined team', team_left: 'Left team', team_kicked: 'Removed', team_locked: 'Team locked', unlock: 'Unlock', flag: 'Flag', photo: 'Photo', stop_moved: 'Stop moved', checkin: 'Base check-in', hub_flag: 'Flag handed in', qr: 'QR scan', finished: 'Finished', admin_action: 'Admin action', broadcast: 'Broadcast', help: 'Help request', game: 'Event control', content: 'Content edit', photo_review: 'Photo review' };
+const KIND_LABEL = { team_created: 'Team created', team_joined: 'Joined team', team_left: 'Left team', team_kicked: 'Removed', team_locked: 'Team locked', unlock: 'Unlock', flag: 'Flag', photo: 'Photo', stop_moved: 'Stop moved', checkin: 'Base check-in', hub_flag: 'Flag handed in', qr: 'QR scan', finished: 'Finished', admin_action: 'Admin action', broadcast: 'Broadcast', discover: 'Discovered', help: 'Help request', game: 'Event control', content: 'Content edit', photo_review: 'Photo review' };
 
 const A = {
   stops: [], live: null, teams: [], events: [], tab: 'map', skew: 0,
   selectedStop: null, draft: null, relocating: false, selectedTeam: null, teamEvents: [],
-  map: null, maplibregl: null, stopMarkers: new Map(), coinMarkers: new Map(), logOldest: null, logFilter: { kind: '', team: '', q: '' },
+  alerts: [], map: null, maplibregl: null, stopMarkers: new Map(), coinMarkers: new Map(), logOldest: null, logFilter: { kind: '', team: '', q: '' },
 };
 let toastTimer;
 
@@ -58,6 +58,8 @@ async function startConsole(who) {
   setInterval(refreshLive, 3000);
   setInterval(() => { if (A.tab === 'teams') refreshTeams(); if (A.tab === 'log' && $('#logLive').checked) loadEvents(true); }, 6000);
   refreshTeams();
+  refreshAlerts();
+  setInterval(refreshAlerts, 10000);
 }
 
 // ---------- counters ----------
@@ -246,6 +248,31 @@ async function refreshLive() {
   } catch (error) { console.warn('live refresh failed', error); }
 }
 
+// ---------- alerts: teams that need an organiser ----------
+async function refreshAlerts() {
+  try { A.alerts = await api.adminAlerts(); } catch (error) { console.warn('alerts failed', error); return; }
+  const bar = $('#alertBar');
+  bar.hidden = !A.alerts.length;
+  bar.innerHTML = A.alerts.map((a, i) => `<div class="alert ${a.kind}">${a.kind === 'stalled'
+      ? `⏱ <b>${esc(a.teamName)}</b> has done nothing for ${a.minutes} min`
+      : `⚠ <b>${esc(a.teamName)}</b> got “${esc(a.title || 'a question')}” wrong ${a.wrong}× in 15 min`}
+      <button type="button" data-alert-hint="${i}">Send hint</button><button type="button" data-alert-open="${i}">Open team</button></div>`).join('');
+  if (A.tab === 'teams') renderTeamList();
+}
+$('#alertBar').addEventListener('click', async (e) => {
+  const hint = e.target.closest('[data-alert-hint]'); const open = e.target.closest('[data-alert-open]');
+  if (hint) await sendHint(A.alerts[Number(hint.dataset.alertHint)].teamId);
+  if (open) { A.selectedTeam = A.alerts[Number(open.dataset.alertOpen)].teamId; document.querySelector('[data-tab=teams]').click(); await refreshTeams(); }
+});
+/** A one-team broadcast: the organiser types a nudge, only that team sees it. */
+async function sendHint(teamId) {
+  const team = A.teams.find((t) => t.id === teamId);
+  const message = prompt(`Hint for ${team?.name || 'this team'} (only they will see it):`);
+  if (!message) return;
+  const result = await api.adminBroadcast(message, teamId, 'info');
+  toast(result.ok ? 'Hint sent to that team.' : result.error);
+}
+
 // ---------- teams ----------
 const stopsCleared = (team) => A.stops.filter((s) => s.role !== 'hub' && s.puzzles.length && s.puzzles.every((p) => team.solved.some((x) => x.stopId === s.id && x.idx === p.idx))).length;
 
@@ -259,7 +286,7 @@ async function refreshTeams() {
 function renderTeamList() {
   const sorted = [...A.teams].sort((a, b) => b.solved.length - a.solved.length || String(a.name).localeCompare(b.name));
   $('#teamList').innerHTML = sorted.length ? sorted.map((t) => `<button type="button" class="team-item ${A.selectedTeam === t.id ? 'active' : ''}" data-team="${esc(t.id)}">
-      <div class="top"><strong>${esc(t.name)}</strong><span class="score">${t.solved.length}/${totalFlags()}</span></div>
+      <div class="top"><strong>${esc(t.name)}${t.isTest ? ' <span class="mini test">TEST</span>' : ''}${A.alerts.some((a) => a.teamId === t.id) ? '<span class="flag-alert" title="Needs attention">⚠</span>' : ''}</strong><span class="score">${t.solved.length}/${totalFlags()}</span></div>
       <div class="pips">${A.stops.flatMap((s) => s.puzzles.map((p) => `<i class="${p.kind} ${t.solved.some((x) => x.stopId === s.id && x.idx === p.idx) ? 'on' : ''}"></i>`)).join('')}</div>
       <small>${t.members.length} players · ${stopsCleared(t)}/${A.stops.length} stops cleared · ${t.locked ? 'locked' : 'not locked'} · active ${ago(t.lastActivity)}</small></button>`).join('')
     : '<div class="empty">No teams yet.</div>';
@@ -281,6 +308,7 @@ async function renderTeamDetail() {
   const others = A.teams.filter((x) => x.id !== t.id);
   const actionsPanel = `<div class="panel"><h3>ORGANISER ACTIONS</h3><div class="team-actions">
       <button type="button" class="btn" ${act(t.locked ? 'unlock_team' : 'lock_team')}>${t.locked ? 'Unlock team (let them edit)' : 'Lock team'}</button>
+      <button type="button" class="btn" ${act('hint')}>Send them a hint</button>
       <button type="button" class="btn" ${act('rename')}>Rename</button>
       ${t.startedAt ? '' : `<button type="button" class="btn" ${act('check_in')}>Check in for them</button>`}
       ${t.finishedAt ? `<button type="button" class="btn" ${act('clear_finish')}>Clear finish</button>` : ''}
@@ -306,6 +334,7 @@ $('#teamDetail').addEventListener('click', async (e) => {
   if (!b || !A.selectedTeam) return;
   const action = b.dataset.act;
   const team = A.teams.find((x) => x.id === A.selectedTeam);
+  if (action === 'hint') return sendHint(A.selectedTeam);
   const body = { action, team: A.selectedTeam, stop: b.dataset.stop, idx: b.dataset.idx != null ? Number(b.dataset.idx) : undefined, user: b.dataset.user };
   if (action === 'rename') { body.name = prompt('New team name', team.name); if (!body.name) return; }
   if (action === 'reset_progress' && !confirm(`Reset ALL progress for ${team.name}? Their solves, unlocks, check-in and photos are erased.`)) return;
