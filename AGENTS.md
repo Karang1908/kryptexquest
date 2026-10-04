@@ -1,11 +1,12 @@
 # Kryptex Quest repository notes
 
-- This repository currently contains a web prototype with no package install step. Serve the root with `python3 -m http.server 4173` and open `http://localhost:4173`.
-- In this workspace the sandbox blocks opening a local socket (`PermissionError: [Errno 1] Operation not permitted`); browser verification of the server may require an escalated local command.
-- `index.html` defines the app shell and dialogs. `styles.css` holds responsive styling. `app.js` holds sample stations, state, UI actions, and the optional MapLibre map. Keep changes small and follow the existing plain JavaScript pattern.
-- `CONTEXT.md` is the product and decision log. Update it when the game rules, campus data, assets, or implementation status change.
-- The campus center is real; the four stop pins are provisional examples. Do not present them as surveyed or event-ready coordinates.
-- The photo approval action is a labeled simulation. Never describe it as real AI verification or send photos to a third party without an explicit product decision.
-- Test the full unlock → three puzzles → handoff flow in the browser after changing quest state logic. Test desktop and phone widths after changing layout.
-- MapLibre JS/CSS, OpenFreeMap tiles, Google Fonts, and `<model-viewer>` load remotely. The illustrated map and CSS avatar portraits are fallbacks when remote services are unavailable. The two character GLBs live in `assets/`.
-- MapLibre's remote stylesheet applies `position: relative` to the map element after local CSS loads. Keep the `#map.map-canvas` size/position override or the map collapses to zero height.
+- No build or install step. Serve the root: `python3 -m http.server 4173`, open `http://localhost:4173`. In this workspace the sandbox blocks local sockets (`PermissionError: [Errno 1] Operation not permitted`), so run the server and any browser test with the sandbox disabled.
+- The Claude-in-Chrome extension may be disconnected. Headless Playwright works instead (`python3` has `playwright`; Chromium is cached). Launch with `--use-gl=swiftshader --enable-webgl --ignore-gpu-blocklist --enable-unsafe-swiftshader` or the map/model-viewer will not render. Keep scratch scripts outside the repo.
+- Layout: `index.html` (shell, dialogs), `styles.css`, `js/` (`app.js` UI/orchestration, `world.js` map + avatar + markers, `geo.js` GPS/simulator, `api.js` Supabase-or-demo backend, `data.js` demo content, `config.js` public settings, `login-art.js`), `supabase/` (migration, seed, `verify-photo` edge function), `assets/` (two character GLBs).
+- Plain ES modules, no framework or bundler. Keep that. Remote deps: MapLibre (unpkg, pinned `6.11.2`), OpenFreeMap dark style, model-viewer 4.3.1 (ajax.googleapis.com), supabase-js (jsdelivr), Google Fonts.
+- `CONTEXT.md` is the product and decision log. Update it when rules, data, setup or verification status change.
+- The campus center is real; the four stop pins are provisional examples. Never present them as surveyed or event-ready.
+- Photo verification is simulated in demo mode (labelled) and a stub returning 501 in the edge function. Never claim real AI verification, and never send photos to a third party without an explicit product decision.
+- Flags in `js/data.js` and `supabase/seed.sql` are samples. Real flags go in the gitignored `supabase/seed.local.sql`, never into committed files.
+- Landmines found: (1) MapLibre's remote CSS sets `#map` to `position: relative`; keep the `#map.map-canvas` override. (2) Do not set `orientation` on `<model-viewer>` 4.3.1 (throws `Cannot read properties of null (reading 'add')` every change); rotate with `camera-orbit`. (3) Do not give a MapLibre Marker's own element a CSS `transform`/animation; animate a child. (4) Do not re-render the stop sheet on a timer while an input may have focus (it wipes typing); it re-renders only when range flips.
+- Test the full flow after changing quest logic (sign-in → map → walk → open stop → unlock → 3 puzzles → clue → next stop), at phone width and desktop width. Location can be tested with the in-app simulator (menu toggle, WASD/arrows, or the pad) or Playwright `set_geolocation`.
