@@ -115,7 +115,8 @@ async function rpc(name, args = {}) {
 const where = (pos) => ({ p_lat: pos?.lat ?? null, p_lng: pos?.lng ?? null, p_acc: pos?.accuracy ?? 0 });
 
 export const checkIn = async (pos) => (hasBackend ? rpc('hub_checkin', where(pos)) : demoAct(engine.checkIn, pos));
-export const unlock = async (stop, flag, pos) => (hasBackend ? rpc('unlock_stop', { p_stop: stop.id, p_flag: flag, ...where(pos) }) : demoAct(engine.unlockChain, pos, stop.id, flag));
+/** Walking into a location unlocks it (when it is available). */
+export const arrive = async (stop, pos) => (hasBackend ? rpc('arrive_stop', { p_stop: stop.id, ...where(pos) }) : demoAct(engine.arrive, pos, stop.id));
 export const hubAnswer = async (stop, answer, pos) => (hasBackend ? rpc('hub_answer', { p_stop: stop.id, p_answer: answer, ...where(pos) }) : demoAct(engine.hubAnswer, pos, stop.id, answer));
 export const hubFlag = async (flag, pos) => (hasBackend ? rpc('hub_submit_flag', { p_flag: flag, ...where(pos) }) : demoAct(engine.hubFlag, pos, flag));
 export const submitFlag = async (stop, idx, flag, pos) => (hasBackend ? rpc('submit_flag', { p_stop: stop.id, p_idx: idx, p_flag: flag, ...where(pos) }) : demoAct(engine.submitFlag, pos, stop.id, idx, flag));
@@ -261,7 +262,6 @@ export async function adminSaveLocation(stop) {
   if (!/^[a-z0-9][a-z0-9_-]{1,29}$/.test(id)) return { ok: false, error: 'Location id: 2-30 characters, a-z 0-9 - _' };
   if (!stop.place?.trim() || !stop.name?.trim()) return { ok: false, error: 'Place name and quest title are required.' };
   if (role === 'stop' && (!stop.exitFlag?.trim() || !stop.nextClue?.trim())) return { ok: false, error: 'A location needs its handoff flag and a next clue.' };
-  if (role === 'bonus' && !stop.exitFlag?.trim()) return { ok: false, error: 'The bonus location needs a final flag.' };
   if (role === 'stop' && stop.entryMode === 'hub' && (!stop.entryQuestion?.trim() || !stop.entryAnswer?.trim())) return { ok: false, error: 'A base-unlocked location needs its base question and answer.' };
   const content = demoContent();
   if (role === 'hub' && content.some((s) => s.role === 'hub' && s.id !== id)) return { ok: false, error: 'There is already a base location.' };
