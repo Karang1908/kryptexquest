@@ -53,6 +53,7 @@ export function createLocation({ onFix, onStatus }) {
 
   function startGps() {
     stopSim();
+    if (!window.isSecureContext) { onStatus('insecure'); return; }   // browsers refuse location (silently, no prompt) on plain http
     if (!navigator.geolocation) { onStatus('unavailable', 'This browser has no location support.'); return; }
     if (watchId !== null) return;
     onStatus('searching');
