@@ -1,43 +1,43 @@
 -- SAMPLE content matching js/data.js (demo flags!). Do not commit real flags: put them in
 -- supabase/seed.local.sql (gitignored) and run that instead.
--- Coordinates are provisional, not surveyed.
+-- Coordinates are provisional, not surveyed. Run after migration 0004.
 
-insert into public.stops (id, ord, name, place, label, type, icon, lat, lng, radius_m, description) values
-  ('lobby', 1, 'The Arrival', 'Main Lobby', '01 / START HERE', 'lobby', '✳', 25.13111, 55.41864, 50, 'The first signal is hiding where every campus story begins.'),
-  ('library', 2, 'Between the Lines', 'Library', '02 / KNOWLEDGE', 'library', '⌘', 25.13152, 55.41886, 50, 'Quiet shelves. Loud secrets. Follow the first handoff flag here.'),
-  ('lab', 3, 'Maker Mode', 'Academic Block', '03 / DISCOVERY', 'lab', '⚙', 25.1317, 55.41946, 50, 'Look for a place where experiments take shape.'),
-  ('courtyard', 4, 'Final Frequency', 'Campus Courtyard', '04 / FINAL STOP', 'courtyard', '◆', 25.1309, 55.41933, 50, 'The trail ends in the open. One final burst of signal remains.');
+insert into public.stops (id, ord, role, entry_mode, name, place, label, type, icon, lat, lng, radius_m, description) values
+  ('base', 0, 'hub', 'open', 'Base Camp', 'Vending Machine Area', 'BASE', 'hub', '⌂', 25.13126, 55.4188, 30, 'Start here. Check in, read the hints, and hand in the flags you collect.'),
+  ('lobby', 1, 'stop', 'hub', 'The Arrival', 'Main Lobby', '01 / WELCOME', 'lobby', '✳', 25.13111, 55.41864, 50, 'Where every campus story begins.'),
+  ('library', 2, 'stop', 'chain', 'Between the Lines', 'Library', '02 / KNOWLEDGE', 'library', '⌘', 25.13152, 55.41886, 50, 'Quiet shelves. Loud secrets.'),
+  ('lab', 3, 'stop', 'chain', 'Maker Mode', 'Academic Block', '03 / DISCOVERY', 'lab', '⚙', 25.1317, 55.41946, 50, 'Where experiments take shape.'),
+  ('courtyard', 4, 'stop', 'chain', 'Final Frequency', 'Campus Courtyard', '04 / OPEN AIR', 'courtyard', '◆', 25.1309, 55.41933, 50, 'The trail runs out into the open.'),
+  ('vault', 5, 'bonus', 'open', 'The Vault', 'Kryptex Vault', 'BONUS', 'bonus', '★', 25.1319, 55.41905, 40, 'The bonus location: only for teams that brought every flag home.');
 
-insert into public.stop_secrets (stop_id, exit_flag, next_clue) values
-  ('lobby', 'KQ{OPEN_BOOK}', 'A place where you study, search, and get lost in stories.'),
-  ('library', 'KQ{BUILD_IDEA}', 'Where hands and tools turn ideas into things.'),
-  ('lab', 'KQ{GREEN_SIGNAL}', 'Go where the campus opens up to the sky.'),
-  ('courtyard', 'KQ{QUEST_COMPLETE}', 'The Kryptex has been found. You finished the campus trail.');
+insert into public.stop_secrets (stop_id, hint, entry_question, entry_answer, exit_flag, next_clue) values
+  ('base', '', null, null, null, null),
+  ('lobby', 'Where every visitor first walks in.', 'Demo: the base question. Type KQ{CHIPS} to unlock this location.', 'KQ{CHIPS}', 'KQ{OPEN_BOOK}', 'A place where you study, search, and get lost in stories.'),
+  ('library', 'Where books stand shoulder to shoulder.', null, null, 'KQ{BUILD_IDEA}', 'Where hands and tools turn ideas into things.'),
+  ('lab', 'Where experiments take shape.', null, null, 'KQ{GREEN_SIGNAL}', 'Go where the campus opens up to the sky.'),
+  ('courtyard', 'Where the campus opens up to the sky.', null, null, 'KQ{QUEST_CLEAR}', 'Return to the base with every flag you found.'),
+  ('vault', 'Only revealed once every flag is handed in at the base.', null, null, 'KQ{KRYPTEX_FOUND}', 'You found the Kryptex.');
 
 insert into public.puzzles (stop_id, idx, title, prompt, kind) values
-  ('lobby', 0, 'First contact', 'Decode the welcome terminal. Enter the sample flag to initialize your expedition.', 'flag'),
-  ('lobby', 1, 'Emergency eyes', 'Find the red device used to alert people in an emergency. Photograph it.', 'photo'),
-  ('lobby', 2, 'The last digit', 'Every quest needs a key. Enter the sample flag to finish this location.', 'flag'),
-  ('library', 0, 'Shelf signal', 'A place where books stand shoulder to shoulder. Enter the sample flag.', 'flag'),
-  ('library', 1, 'Study light', 'Photograph a lamp or light used at a study desk.', 'photo'),
-  ('library', 2, 'Final page', 'Complete the reading trail with this sample flag.', 'flag'),
-  ('lab', 0, 'Prototype zero', 'A simple start to a complex build. Enter the sample flag.', 'flag'),
-  ('lab', 1, 'Safety first', 'Photograph an exit sign or another clearly marked safety sign.', 'photo'),
-  ('lab', 2, 'The circuit', 'Close the circuit with the sample flag.', 'flag'),
-  ('courtyard', 0, 'Open air', 'Enter the sample flag for the final location.', 'flag'),
-  ('courtyard', 1, 'Living clue', 'Photograph a tree or planted greenery on campus.', 'photo'),
-  ('courtyard', 2, 'Kryptex found', 'Enter the final sample flag.', 'flag');
+  ('lobby', 0, 'Emergency eyes', 'Find the red device used to alert people in an emergency.', 'photo'),
+  ('lobby', 1, 'First contact', 'Demo question: type KQ{HELLO_CAMPUS} to say hello.', 'flag'),
+  ('lobby', 2, 'The last digit', 'Demo question: type KQ{LOBBY_CLEAR} to finish this location.', 'flag'),
+  ('library', 0, 'Study light', 'Find the object used to light a study desk.', 'photo'),
+  ('library', 1, 'Shelf signal', 'Demo question: type KQ{STACKS}.', 'flag'),
+  ('lab', 0, 'Safety first', 'Find a clearly marked exit or safety sign.', 'photo'),
+  ('lab', 1, 'The circuit', 'Demo question: type KQ{CIRCUIT}.', 'flag'),
+  ('courtyard', 0, 'Living clue', 'Find a tree or planted greenery.', 'photo'),
+  ('courtyard', 1, 'Open air', 'Demo question: type KQ{OUTSIDE}.', 'flag'),
+  ('vault', 0, 'Kryptex found', 'Demo question: type KQ{FOUND_IT} to finish the quest.', 'flag');
 
-insert into public.puzzle_secrets (stop_id, idx, flag) values
-  ('lobby', 0, 'KQ{HELLO_CAMPUS}'),
-  ('lobby', 1, null),
-  ('lobby', 2, 'KQ{LOBBY_CLEAR}'),
-  ('library', 0, 'KQ{STACKS}'),
-  ('library', 1, null),
-  ('library', 2, 'KQ{PAGE_TURNER}'),
-  ('lab', 0, 'KQ{MAKER}'),
-  ('lab', 1, null),
-  ('lab', 2, 'KQ{CIRCUIT}'),
-  ('courtyard', 0, 'KQ{OUTSIDE}'),
-  ('courtyard', 1, null),
-  ('courtyard', 2, 'KQ{FOUND_IT}');
+insert into public.puzzle_secrets (stop_id, idx, flag, question) values
+  ('lobby', 0, 'KQ{ALARM}', 'Photo verified. Demo question: type KQ{ALARM}.'),
+  ('lobby', 1, 'KQ{HELLO_CAMPUS}', null),
+  ('lobby', 2, 'KQ{LOBBY_CLEAR}', null),
+  ('library', 0, 'KQ{BRIGHT_MIND}', 'Photo verified. Demo question: type KQ{BRIGHT_MIND}.'),
+  ('library', 1, 'KQ{STACKS}', null),
+  ('lab', 0, 'KQ{SAFE_ROUTE}', 'Photo verified. Demo question: type KQ{SAFE_ROUTE}.'),
+  ('lab', 1, 'KQ{CIRCUIT}', null),
+  ('courtyard', 0, 'KQ{ROOTED}', 'Photo verified. Demo question: type KQ{ROOTED}.'),
+  ('courtyard', 1, 'KQ{OUTSIDE}', null),
+  ('vault', 0, 'KQ{FOUND_IT}', null);
