@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f6f4ee" />
+    <meta name="description" content="Kryptex Quest: an on-campus CTF adventure at BITS Pilani Dubai Campus." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23d5f45c'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-size='45' fill='%23263b2e'%3E%E2%9C%B3%3C/text%3E%3C/svg%3E" />
+    <title>Kryptex Quest · BITS Dubai</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="rail" aria-label="Quest navigation">
+        <div class="brand-row">
+          <div class="brand-mark" aria-hidden="true"><span>✳</span></div>
+          <div class="brand-copy"><strong>KRYPTEX<span>QUEST</span></strong><small>GDG ON CAMPUS · BITS DUBAI</small></div>
+        </div>
+
+        <div class="rail-heading"><span class="eyebrow">YOUR EXPEDITION</span><h1>Campus, meet<br /><em>the unknown.</em></h1><p>Follow the clues. Find the objects. Capture the flags.</p></div>
+
+        <button class="player-card" id="avatarButton" type="button" aria-label="Choose your explorer avatar">
+          <span class="player-portrait" id="playerPortrait" aria-hidden="true"><span class="portrait-head"></span><span class="portrait-body"></span></span>
+          <span><small>EXPLORER PROFILE</small><strong id="playerName">The Adventurer</strong><span class="player-card-sub">Change character ↗</span></span>
+          <span class="player-card-arrow" aria-hidden="true">↗</span>
+        </button>
+
+        <div class="route-head"><span class="eyebrow">THE QUEST ROUTE</span><span id="routeCount">0 / 4</span></div>
+        <nav id="routeList" class="route-list" aria-label="Quest locations"></nav>
+        <div class="rail-bottom"><div class="signal-pill"><span class="pulse-dot"></span> PREVIEW MODE</div><p>Locations and puzzles are sample content. Your event team can replace them before launch.</p></div>
+      </aside>
+
+      <main class="world" aria-label="Campus quest map">
+        <div id="map" class="map-canvas" aria-label="Interactive campus map"></div>
+        <div id="mapFallback" class="map-fallback" aria-label="Illustrated campus preview">
+          <div class="fallback-road road-one"></div><div class="fallback-road road-two"></div>
+          <div class="fallback-road road-three"></div><div class="fallback-road road-four"></div>
+          <div class="fallback-campus">
+            <div class="campus-building building-one"><span>MAIN BUILDING</span></div>
+            <div class="campus-building building-two"><span>LIBRARY</span></div>
+            <div class="campus-building building-three"><span>ACADEMIC BLOCK</span></div>
+            <div class="campus-building building-four"><span>COURTYARD</span></div>
+            <div class="campus-path path-one"></div><div class="campus-path path-two"></div>
+          </div>
+          <span class="fallback-neighborhood n-one">DUBAI INTERNATIONAL<br />ACADEMIC CITY</span>
+          <span class="fallback-neighborhood n-two">ACADEMIC CITY ROAD</span>
+          <div id="fallbackPins" class="fallback-pins"></div>
+          <span class="fallback-notice">Illustrated preview · live tiles loading</span>
+        </div>
+
+        <div class="map-topbar">
+          <div class="location-title"><div class="location-icon">⌖</div><div><small>EXPLORING NOW</small><strong>BITS PILANI · DUBAI CAMPUS</strong><span>Dubai International Academic City, UAE</span></div></div>
+          <div class="map-top-actions"><span class="live-pill"><span></span> LIVE CAMPUS MAP</span><button class="icon-button mobile-avatar-button" id="avatarButtonMobile" type="button" aria-label="Choose your explorer avatar">☺</button><button class="icon-button" id="helpButton" type="button" aria-label="How to play">?</button></div>
+        </div>
+
+        <div class="map-hud"><div class="hud-kicker">KRYPTEX SIGNAL</div><div class="hud-title">The campus is your puzzle.</div><p>Start at the lobby. Every solved stop reveals the next.</p><div class="hud-line"><span id="hudProgress">00</span> / 04 LOCATIONS CLEARED</div></div>
+
+        <div class="explorer-beacon"><model-viewer id="mapAvatar" src="./assets/player-male.glb" alt="Male Adventurer character by Quaternius" autoplay animation-name="CharacterArmature|Idle" camera-orbit="0deg 80deg auto" interaction-prompt="none" shadow-intensity=".4"></model-viewer><div class="explorer-beacon-label"><span>AVATAR</span><strong>PREVIEW</strong></div></div>
+
+        <div class="map-tools"><button class="map-tool" id="recenterButton" type="button" aria-label="Center campus map">◎</button><button class="map-tool" id="locateButton" type="button" aria-label="Use my location">⌖</button><button class="map-tool" id="zoomInButton" type="button" aria-label="Zoom in">+</button><button class="map-tool" id="zoomOutButton" type="button" aria-label="Zoom out">−</button></div>
+
+        <div class="map-bottom"><div class="map-legend"><span><i class="legend-dot current"></i> Current stop</span><span><i class="legend-dot locked"></i> Locked</span><span><i class="legend-dot cleared"></i> Cleared</span></div><div class="map-coords">25.1313° N&nbsp;&nbsp; 55.4190° E <span>·</span> QUEST AREA</div></div>
+
+        <button class="mobile-quest-trigger" id="mobileQuestTrigger" type="button"><span>✳</span><span><small>CURRENT MISSION</small><strong id="mobileMissionName">The Arrival</strong></span><span aria-hidden="true">↑</span></button>
+      </main>
+
+      <aside class="intel" id="missionPanel" aria-label="Selected quest location"></aside>
+    </div>
+
+    <dialog id="avatarDialog" class="app-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close" value="cancel">×</button><span class="eyebrow">YOUR FIELD IDENTITY</span><h2>Choose your explorer.</h2><p>Both characters are Adventurer models by Quaternius, shared as CC0 on Poly Pizza.</p><div class="avatar-options"><button type="button" class="avatar-option" data-avatar="male"><span class="avatar-art male"><span class="avatar-head"></span><span class="avatar-torso"></span><span class="avatar-legs"></span><model-viewer src="./assets/player-male.glb" alt="Male Adventurer 3D model" autoplay animation-name="CharacterArmature|Idle" camera-orbit="0deg 80deg auto" loading="lazy" interaction-prompt="none"></model-viewer></span><strong>Explorer</strong><small>Male adventurer</small></button><button type="button" class="avatar-option" data-avatar="female"><span class="avatar-art female"><span class="avatar-head"></span><span class="avatar-torso"></span><span class="avatar-legs"></span><model-viewer src="./assets/player-female.glb" alt="Female Adventurer 3D model" autoplay animation-name="CharacterArmature|Idle" camera-orbit="0deg 80deg auto" loading="lazy" interaction-prompt="none"></model-viewer></span><strong>Trailblazer</strong><small>Female adventurer</small></button></div><div class="dialog-note">Local GLB models are bundled with this prototype. <a href="https://poly.pizza/m/5EGWBMpuXq" target="_blank" rel="noreferrer">Male source ↗</a> <a href="https://poly.pizza/m/ZwF0K7WBmu" target="_blank" rel="noreferrer">Female source ↗</a></div></form></dialog>
+
+    <dialog id="helpDialog" class="app-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close" value="cancel">×</button><span class="eyebrow">FIELD GUIDE / 01</span><h2>How the quest works</h2><ol class="guide-list"><li><b>Travel to a stop.</b><span>Find the marker at the real campus landmark.</span></li><li><b>Unlock it.</b><span>Enter the handoff flag from the previous location.</span></li><li><b>Solve three puzzles.</b><span>Enter flags or capture the requested real-world object.</span></li><li><b>Follow the reveal.</b><span>Three verified flags expose the clue and password for the next stop.</span></li></ol><p class="guide-note">This is a UI prototype. Photo review and flag checks are simulated locally; production validation belongs on a server.</p><button class="primary-button guide-done" value="done">Back to map <span>↗</span></button></form></dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.3.1/model-viewer.min.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
