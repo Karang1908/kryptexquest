@@ -30,10 +30,9 @@ export function loadMapLibre() {
   return libPromise;
 }
 
-/** Dark OpenFreeMap style with extruded Google-blue buildings and the navy palette above. */
+/** Dark OpenFreeMap style: night sky with a Google-blue horizon, fog, navy palette, extruded buildings. */
 export async function buildStyle() {
   const style = await (await fetch(STYLE_URL)).json();
-  // Night sky with a Google-blue glow on the horizon, and distance fog so the ground melts into it.
   style.sky = {
     'sky-color': '#070b1c', 'horizon-color': '#4a7bff', 'fog-color': '#1b2d66',
     'sky-horizon-blend': 0.55, 'horizon-fog-blend': 0.7, 'fog-ground-blend': 0.35, 'atmosphere-blend': 0,
