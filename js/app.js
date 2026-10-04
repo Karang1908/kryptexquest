@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import * as api from './api.js';
 import { createLocation, distanceM, bearingDeg } from './geo.js';
 import { createWorld } from './world.js';
+import { createCompass } from './compass.js';
 import { startLoginArt } from './login-art.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -49,8 +50,8 @@ function renderHud() {
 function renderGps() {
   const chip = $('#gpsChip');
   const accuracy = S.fix?.accuracy;
-  const label = S.fix?.source === 'sim' ? 'SIM' : S.gps === 'ok' && Number.isFinite(accuracy) ? `±${Math.round(accuracy)} m` : S.gps === 'denied' ? 'OFF' : 'SEARCHING';
-  chip.className = `chip gps ${S.fix?.source === 'sim' ? 'sim' : S.gps === 'ok' ? (accuracy <= 30 ? 'good' : 'weak') : S.gps === 'denied' ? 'bad' : 'wait'}`;
+  const label = S.fix?.source === 'sim' ? 'SIM' : S.gps === 'ok' && Number.isFinite(accuracy) ? `±${Math.round(accuracy)} m` : S.gps === 'denied' || S.gps === 'insecure' ? 'OFF' : 'SEARCHING';
+  chip.className = `chip gps ${S.fix?.source === 'sim' ? 'sim' : S.gps === 'ok' ? (accuracy <= 30 ? 'good' : 'weak') : S.gps === 'denied' || S.gps === 'insecure' ? 'bad' : 'wait'}`;
   $('#gpsText').textContent = label;
 }
 
@@ -223,15 +224,21 @@ function onStatus(status, detail) {
   renderGps();
   const gate = $('#locGate');
   if (status === 'ok' || status === 'searching') gate.hidden = true;
-  if (status === 'denied' || status === 'unavailable') {
-    gate.hidden = false;
-    $('#locTitle').textContent = status === 'denied' ? 'Location is blocked' : 'No location signal';
-    $('#locCopy').textContent = status === 'denied'
-      ? 'Allow location for this site in your browser or phone settings (Safari: aA → Website Settings → Location; Chrome: lock icon → Permissions), then tap retry.'
-      : (detail || 'Could not read your position. Check that location services are on.');
-    $('#locEnable').textContent = 'Retry';
-  }
+  const copy = {
+    denied: ['Location is blocked', 'Allow location for this site in your browser or phone settings (Safari: aA → Website Settings → Location; Chrome: lock icon → Permissions), then tap retry.'],
+    insecure: ['Location needs a secure link', 'Phones only share location with https:// pages, and this one is plain http://, so no permission prompt can appear. Open the HTTPS link from your organisers.'],
+    unavailable: ['No location signal', detail || 'Could not read your position. Check that location services are on.'],
+    waiting: ['Waiting for your location', 'If your browser asked, tap Allow. Indoors, move near a window. You can retry the request below.'],
+  }[status];
+  if (!copy) return;
+  gate.hidden = false;
+  $('#locTitle').textContent = copy[0];
+  $('#locCopy').textContent = copy[1];
+  $('#locEnable').textContent = 'Retry';
+  $('#locEnable').hidden = status === 'insecure';
 }
+
+function syncCompassChip() { $('#compassEnable').hidden = !S.compass.needsGesture(); }
 
 function startSimulator() {
   S.loc.startSim(S.fix || CONFIG.campus);
@@ -241,6 +248,7 @@ function startSimulator() {
 }
 function stopSimulator() {
   S.loc.stopSim();
+  S.compass.clearInjected();
   $('#simPad').hidden = true;
   $('#simToggle').checked = false;
   S.loc.startGps();
@@ -257,9 +265,15 @@ function wireSimulator() {
     button.addEventListener('pointerdown', down);
     ['pointerup', 'pointerleave', 'pointercancel'].forEach((name) => button.addEventListener(name, up));
   });
+  let simFacing = 0;
   const keys = { w: [0, 1], arrowup: [0, 1], s: [0, -1], arrowdown: [0, -1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
   const held = new Map();
   addEventListener('keydown', (e) => {
+    if ((e.key === 'q' || e.key === 'e') && S.loc?.isSim() && !/INPUT|TEXTAREA/.test(document.activeElement?.tagName)) {
+      simFacing = (simFacing + (e.key === 'e' ? 15 : -15) + 360) % 360; // stand-in for turning your phone
+      S.compass.inject(simFacing);
+      return;
+    }
     const dir = keys[e.key.toLowerCase()];
     if (!dir || !S.loc?.isSim() || /INPUT|TEXTAREA/.test(document.activeElement?.tagName)) return;
     held.set(e.key.toLowerCase(), dir);
@@ -398,8 +412,11 @@ async function startGame() {
   S.started = true;
   showScreen('game');
   S.loc = createLocation({ onFix, onStatus });
+  S.compass = createCompass();
+  S.compass.autoStart();
+  $('#compassEnable').hidden = !S.compass.needsGesture();
   try {
-    S.world = await createWorld({ onStopTap: openStop });
+    S.world = await createWorld({ onStopTap: openStop, getCompass: () => S.compass.heading(), onViewChange: (offset) => { $('#viewReset').hidden = !offset; } });
   } catch (error) {
     console.error(error);
     S.started = false;
@@ -430,8 +447,12 @@ async function startGame() {
 async function startLocation() {
   let state = 'prompt';
   try { state = (await navigator.permissions.query({ name: 'geolocation' })).state; } catch { /* Safari: unknown */ }
-  if (state === 'granted') S.loc.startGps();
-  else { $('#locGate').hidden = false; }
+  if (state === 'denied') { onStatus('denied'); return; }
+  // Ask straight away: starting the watch is what makes the browser show its own Allow / Don't allow prompt.
+  if (state === 'prompt') toast('Tap Allow when your browser asks for your location.');
+  S.loc.startGps();
+  // If nothing has arrived after a while, offer a manual retry instead of leaving a silent, empty map.
+  setTimeout(() => { if (!S.fix && S.gps !== 'denied' && S.gps !== 'insecure') onStatus('waiting'); }, 9000);
 }
 
 function showLogin(error) {
@@ -473,7 +494,14 @@ $('#teamMembers').addEventListener('click', (e) => {
   if (kick && confirm('Remove this player from the team?')) teamAction(api.kickMember(kick.dataset.id));
 });
 
-$('#locEnable').addEventListener('click', () => { $('#locGate').hidden = true; S.loc.startGps(); });
+$('#locEnable').addEventListener('click', () => { S.compass.request().then(syncCompassChip); $('#locGate').hidden = true; S.loc.stopGps(); S.loc.startGps(); });
+$('#viewReset').addEventListener('click', () => S.world?.resetView());
+$('#compassEnable').addEventListener('click', async () => {
+  const result = await S.compass.request();
+  syncCompassChip();
+  if (result === 'denied') toast('Compass blocked. Allow Motion & Orientation for this site in Settings.');
+  if (result === 'unsupported') toast('This device has no compass.');
+});
 $('#locSim').addEventListener('click', startSimulator);
 $('#simToggle').addEventListener('change', (e) => (e.target.checked ? startSimulator() : stopSimulator()));
 $('#gpsChip').addEventListener('click', () => toast(S.fix ? `${S.fix.source === 'sim' ? 'Simulated' : 'GPS'} position · accuracy ±${Math.round(S.fix.accuracy)} m` : 'Waiting for a GPS signal…'));
