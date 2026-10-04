@@ -4,21 +4,21 @@ const STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
 
 // Night-time navy palette over OpenFreeMap's flat dark style (layer id -> [paint prop, colour]).
 const PALETTE = {
-  background: ['background-color', '#0c1222'],
-  water: ['fill-color', '#12305e'],
-  landuse_residential: ['fill-color', '#0f1629'],
-  landcover_wood: ['fill-color', '#0f2a22'],
-  landuse_park: ['fill-color', '#12352a'],
-  waterway: ['line-color', '#12305e'],
-  highway_path: ['line-color', '#3b4a73'],
-  highway_minor: ['line-color', '#2a3558'],
-  highway_major_casing: ['line-color', '#34406a'],
-  highway_major_inner: ['line-color', '#232d4d'],
-  highway_major_subtle: ['line-color', '#2d3a63'],
-  highway_motorway_casing: ['line-color', '#34406a'],
-  highway_motorway_subtle: ['line-color', '#2d3a63'],
-  highway_name_other: ['text-color', '#8fa0d0'],
-  highway_name_motorway: ['text-color', '#8fa0d0'],
+  background: ['background-color', '#131d3d'],
+  water: ['fill-color', '#1a4a96'],
+  landuse_residential: ['fill-color', '#16224a'],
+  landcover_wood: ['fill-color', '#14403a'],
+  landuse_park: ['fill-color', '#175a46'],
+  waterway: ['line-color', '#1a4a96'],
+  highway_path: ['line-color', '#5a6cab'],
+  highway_minor: ['line-color', '#3d4f8f'],
+  highway_major_casing: ['line-color', '#fbbc05'],
+  highway_major_inner: ['line-color', '#34447f'],
+  highway_major_subtle: ['line-color', '#3d4f8f'],
+  highway_motorway_casing: ['line-color', '#fbbc05'],
+  highway_motorway_subtle: ['line-color', '#3d4f8f'],
+  highway_name_other: ['text-color', '#a9b8e8'],
+  highway_name_motorway: ['text-color', '#a9b8e8'],
 };
 
 let libPromise;
@@ -33,14 +33,19 @@ export function loadMapLibre() {
 /** Dark OpenFreeMap style with extruded Google-blue buildings and the navy palette above. */
 export async function buildStyle() {
   const style = await (await fetch(STYLE_URL)).json();
+  // Night sky with a Google-blue glow on the horizon, and distance fog so the ground melts into it.
+  style.sky = {
+    'sky-color': '#070b1c', 'horizon-color': '#4a7bff', 'fog-color': '#1b2d66',
+    'sky-horizon-blend': 0.55, 'horizon-fog-blend': 0.7, 'fog-ground-blend': 0.35, 'atmosphere-blend': 0,
+  };
   const index = style.layers.findIndex((layer) => layer.id === 'building');
   if (index >= 0) {
     style.layers.splice(index, 1, {
       id: 'building-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 14,
       paint: {
-        'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 8], 0, '#172036', 30, '#1f2c4d', 90, '#2b3c6b'],
-        'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8],
-        'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
+        'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 8], 0, '#26345f', 30, '#33467c', 90, '#44599a'],
+        'fill-extrusion-height': ['*', 0.7, ['coalesce', ['get', 'render_height'], 8]],
+        'fill-extrusion-base': ['*', 0.7, ['coalesce', ['get', 'render_min_height'], 0]],
         'fill-extrusion-opacity': 0.92,
       },
     });
