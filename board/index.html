@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Kryptex Quest · Live</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body { overflow: auto; background: radial-gradient(120% 80% at 50% 0%, #131b38 0%, var(--bg) 60%); min-height: 100vh; }
+      .wrap { max-width: 1200px; margin: 0 auto; padding: 4vh 4vw; display: grid; gap: 3vh; }
+      header { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+      header h1 { font-size: clamp(32px, 5vw, 64px); }
+      header h1 span { background: linear-gradient(90deg, var(--blue), var(--red) 40%, var(--yellow) 70%, var(--green)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      #state { font: 700 clamp(18px, 2.4vw, 32px) 'Space Grotesk', sans-serif; padding: 10px 22px; border-radius: 999px; background: var(--surface-2); }
+      #state.running { color: #7fdc99; } #state.paused, #state.lobby { color: var(--yellow); } #state.ended { color: #ff9d94; }
+      .row { display: grid; grid-template-columns: 6vw 1fr 22vw; gap: 2vw; align-items: center; padding: 1.6vh 2vw; border-radius: 22px; background: rgba(18, 24, 41, 0.85); border: 1px solid var(--line); font-size: clamp(18px, 2.2vw, 34px); }
+      .row:nth-child(1) { border-color: var(--yellow); box-shadow: 0 0 40px -10px var(--yellow); }
+      .row .pos { font: 700 1.3em 'Space Grotesk', sans-serif; color: var(--muted); }
+      .row:nth-child(-n+3) .pos { color: var(--yellow); }
+      .row strong { display: block; }
+      .row small { color: var(--muted); font-size: 0.55em; }
+      .pips { display: flex; gap: 4px; margin-top: 8px; }
+      .pips i { flex: 1; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); }
+      .pips i.on { background: var(--green); } .pips i.hub { background: var(--yellow); }
+      .time { text-align: right; font: 700 1.1em 'Space Grotesk', sans-serif; }
+      #note { text-align: center; color: var(--muted); font-size: 22px; padding: 12vh 0; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header><h1>Kryptex <span>Quest</span> · Live</h1><div id="state"></div></header>
+      <div id="rows"></div>
+      <p id="note" hidden></p>
+    </div>
+    <script type="module" src="./board.js"></script>
+  </body>
+</html>
