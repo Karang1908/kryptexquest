@@ -106,18 +106,20 @@ export async function loadView() {
   return data;
 }
 
+/** A failure to reach the server at all (as opposed to the server saying no). */
+const offlineish = (error) => (typeof navigator !== 'undefined' && navigator.onLine === false) || /failed to fetch|networkerror|network request failed|load failed/i.test(String(error?.message || ''));
+
 async function rpc(name, args = {}) {
   const sb = await supabase();
   const { data, error } = await sb.rpc(name, args);
-  if (error) return { ok: false, error: error.message };
+  if (error) return offlineish(error) ? { ok: false, offline: true, error: 'No connection.' } : { ok: false, error: error.message };
   return { ...(data || { ok: true }), view: (await sb.rpc('my_progress')).data };
 }
 const where = (pos) => ({ p_lat: pos?.lat ?? null, p_lng: pos?.lng ?? null, p_acc: pos?.accuracy ?? 0 });
 
 export const checkIn = async (pos) => (hasBackend ? rpc('hub_checkin', where(pos)) : demoAct(engine.checkIn, pos));
-/** Walking into a location unlocks it (when it is available). */
-export const arrive = async (stop, pos) => (hasBackend ? rpc('arrive_stop', { p_stop: stop.id, ...where(pos) }) : demoAct(engine.arrive, pos, stop.id));
-export const hubAnswer = async (stop, answer, pos) => (hasBackend ? rpc('hub_answer', { p_stop: stop.id, p_answer: answer, ...where(pos) }) : demoAct(engine.hubAnswer, pos, stop.id, answer));
+/** Unlock a discovered location by typing its entry flag there. */
+export const unlock = async (stop, flag, pos) => (hasBackend ? rpc('unlock_stop', { p_stop: stop.id, p_flag: flag, ...where(pos) }) : demoAct(engine.unlockStop, pos, stop.id, flag));
 export const hubFlag = async (flag, pos) => (hasBackend ? rpc('hub_submit_flag', { p_flag: flag, ...where(pos) }) : demoAct(engine.hubFlag, pos, flag));
 export const submitFlag = async (stop, idx, flag, pos) => (hasBackend ? rpc('submit_flag', { p_stop: stop.id, p_idx: idx, p_flag: flag, ...where(pos) }) : demoAct(engine.submitFlag, pos, stop.id, idx, flag));
 export const scanQr = async (stopId, token) => (hasBackend ? rpc('scan_qr', { p_stop: stopId, p_token: token }) : demoAct(engine.scanQr, null, stopId, token));
@@ -140,10 +142,48 @@ export async function verifyPhoto(stop, idx, blob, pos) {
   return demoAct(engine.photoClear, pos, stop.id, idx);
 }
 
-/** Latest position for the organisers' live map. Fire and forget. */
+/**
+ * Sends the latest position (the organisers' live map) and, in the same call, discovers hidden locations: the phone does
+ * not know where they are, so the server checks. Resolves { discovered: [{ id, ord }] }.
+ */
 export async function sendLocation(fix) {
-  if (!hasBackend) { writeJson(KEYS.loc, { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, at: Date.now() }); return; }
-  await (await supabase()).rpc('update_my_location', { p_lat: fix.lat, p_lng: fix.lng, p_accuracy: fix.accuracy ?? null });
+  if (!hasBackend) {
+    writeJson(KEYS.loc, { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, at: Date.now() });
+    const state = demoState();
+    const discovered = engine.discover({ content: demoContent(), state, game: demoGame(), team: demoTeam(), pos: fix, me: 'demo', now: Date.now() });
+    if (discovered.length) writeJson(KEYS.state, state);
+    // Demo teammates (invented) wander around you so the teammate dots can be seen.
+    const t = Date.now() / 6000;
+    const mates = (demoTeam()?.members || []).filter((m) => m.id !== 'demo' && m.id !== demoTeam()?.me).map((m, i) => ({
+      id: m.id, name: m.name, avatar: m.avatar, lat: fix.lat + 0.00009 * Math.sin(t + i * 2), lng: fix.lng + 0.00012 * Math.cos(t + i * 2), at: new Date().toISOString(),
+    }));
+    return { discovered, mates };
+  }
+  const { data } = await (await supabase()).rpc('update_my_location', { p_lat: fix.lat, p_lng: fix.lng, p_accuracy: fix.accuracy ?? null });
+  return data || { discovered: [], mates: [] };
+}
+
+/** The team's story after the finish: times per location, rank, fastest solve. Demo builds it from local state. */
+export async function teamRecap() {
+  if (!hasBackend) return engine.buildRecap({ content: demoContent(), state: demoState(), team: demoTeam() });
+  const { data, error } = await (await supabase()).rpc('team_recap');
+  return error ? { ok: false, error: error.message } : data;
+}
+
+/** Organisers only: play through the game as a one-person test team that never shows on the leaderboard. */
+export async function rehearsalAvailable() {
+  if (!hasBackend) return false;
+  try { return await adminCheck(); } catch { return false; }
+}
+export async function startRehearsal() {
+  if (!hasBackend) return { ok: false, error: 'Demo mode is already a rehearsal.' };
+  const result = await adminRpc('admin_start_rehearsal', {});
+  return { ...result, view: (await (await supabase()).rpc('my_progress')).data };
+}
+export async function endRehearsal() {
+  if (!hasBackend) return { ok: false, error: 'Demo mode is already a rehearsal.' };
+  const result = await adminRpc('admin_end_rehearsal', {});
+  return { ...result, view: (await (await supabase()).rpc('my_progress')).data };
 }
 
 export async function leaderboard() {
@@ -262,7 +302,6 @@ export async function adminSaveLocation(stop) {
   if (!/^[a-z0-9][a-z0-9_-]{1,29}$/.test(id)) return { ok: false, error: 'Location id: 2-30 characters, a-z 0-9 - _' };
   if (!stop.place?.trim() || !stop.name?.trim()) return { ok: false, error: 'Place name and quest title are required.' };
   if (role === 'stop' && (!stop.exitFlag?.trim() || !stop.nextClue?.trim())) return { ok: false, error: 'A location needs its handoff flag and a next clue.' };
-  if (role === 'stop' && stop.entryMode === 'hub' && (!stop.entryQuestion?.trim() || !stop.entryAnswer?.trim())) return { ok: false, error: 'A base-unlocked location needs its base question and answer.' };
   const content = demoContent();
   if (role === 'hub' && content.some((s) => s.role === 'hub' && s.id !== id)) return { ok: false, error: 'There is already a base location.' };
   const at = content.findIndex((s) => s.id === id);
@@ -318,6 +357,14 @@ export async function adminDeleteQuestion(stopId, idx) {
   demoContentSave(content);
   return { ok: true };
 }
+/** Teams that need an organiser: stalled for 10+ minutes, or stuck on one question. */
+export async function adminAlerts() {
+  if (!hasBackend) return demoAdmin.alerts();
+  const { data, error } = await (await supabase()).rpc('admin_alerts');
+  if (error) throw error;
+  return data;
+}
+
 export async function adminQuestionStats() {
   if (!hasBackend) return [];
   const { data } = await (await supabase()).rpc('admin_question_stats');
@@ -469,8 +516,8 @@ export async function adminTeamAction(p) {
     case 'reset_progress': writeJson(KEYS.state, engine.emptyState()); return { ok: true };
     case 'check_in': state.startedAt ||= Date.now(); break;
     case 'clear_finish': state.finishedAt = null; break;
-    case 'grant_stop': if (stop) { if (!state.unlocked.includes(stop.id)) state.unlocked.push(stop.id); stop.puzzles.forEach((_, i) => { state.solved[key(i)] ||= { by: null, at: Date.now() }; }); } break;
-    case 'grant_puzzle': if (stop) { if (!state.unlocked.includes(stop.id)) state.unlocked.push(stop.id); state.solved[key(p.idx)] ||= { by: null, at: Date.now() }; } break;
+    case 'grant_stop': if (stop) { if (!state.unlocked.includes(stop.id)) state.unlocked.push(stop.id); if (!(state.discovered ||= []).includes(stop.id)) state.discovered.push(stop.id); stop.puzzles.forEach((_, i) => { state.solved[key(i)] ||= { by: null, at: Date.now() }; }); } break;
+    case 'grant_puzzle': if (stop) { if (!state.unlocked.includes(stop.id)) state.unlocked.push(stop.id); if (!(state.discovered ||= []).includes(stop.id)) state.discovered.push(stop.id); state.solved[key(p.idx)] ||= { by: null, at: Date.now() }; } break;
     case 'revoke_puzzle': delete state.solved[key(p.idx)]; state.finishedAt = null; break;
     case 'grant_hub_flag': if (stop && !state.hubFlags.includes(stop.id)) state.hubFlags.push(stop.id); break;
     default: return { ok: false, error: 'Unknown action.' };
