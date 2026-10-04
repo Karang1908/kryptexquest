@@ -293,3 +293,34 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; margin: 0; letter-spacing
 .board-row small { color: var(--muted); display: block; font-size: 11px; }
 .board-row .time { font-family: 'Space Grotesk', sans-serif; font-weight: 700; text-align: right; }
 .menu-list .danger { color: #ff8b82; }
+
+.near-card.hint-only .near-arrow, .near-card.hint-only .near-dist { display: none; }
+.near-card.hint-only { border-color: var(--blue); }
+.near-card.hint-only .near-text strong { white-space: normal; font-size: 15px; }
+
+.menu-locations { display: grid; gap: 8px; }
+.menu-label { margin: 4px 2px 0; font-size: 11px; letter-spacing: .12em; color: var(--muted, #9aa4b2); }
+.menu-locations button { display: flex; align-items: center; gap: 10px; }
+.menu-locations small { margin-left: auto; opacity: .7; }
+.menu-locations .dot { width: 10px; height: 10px; border-radius: 50%; background: #8a93a3; flex: none; }
+.menu-locations .dot.open { background: #4285f4; }
+.menu-locations .dot.cleared { background: #34a853; }
+
+/* teammates on the map */
+.mate-pin { display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none; }
+.mate-dot { width: 14px; height: 14px; border-radius: 50%; background: #34a853; border: 2px solid #fff; box-shadow: 0 0 0 4px rgba(52, 168, 83, .3); }
+.mate-name { font: 600 11px/1 var(--font-body, system-ui); color: #fff; background: rgba(8, 14, 28, .78); padding: 3px 7px; border-radius: 999px; white-space: nowrap; }
+
+/* rehearsal / offline badges */
+.hud-badge { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 66px); left: 50%; transform: translateX(-50%); z-index: 6; padding: 5px 12px; border-radius: 999px; font: 700 12px/1 var(--font-body, system-ui); letter-spacing: .04em; pointer-events: none; }
+.hud-badge.offline { background: #ea4335; color: #fff; }
+.hud-badge.test { background: #fbbc04; color: #1b1400; top: calc(env(safe-area-inset-top, 0px) + 94px); }
+
+/* recap */
+.recap-line { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 14px; }
+.recap-line b { color: var(--text); }
+.recap-line small { color: var(--muted, #9aa4b2); }
+.recap-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; text-align: center; }
+.recap-stats div { background: rgba(255,255,255,.06); border-radius: 12px; padding: 10px 4px; }
+.recap-stats strong { display: block; font-size: 20px; }
+.recap-stats small { font-size: 10px; letter-spacing: .08em; color: var(--muted, #9aa4b2); }
