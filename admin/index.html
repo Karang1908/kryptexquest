@@ -31,6 +31,7 @@
           <button role="tab" data-tab="log" aria-selected="false">Activity log</button>
           <button role="tab" data-tab="content" aria-selected="false">Content</button>
           <button role="tab" data-tab="photos" aria-selected="false">Photos <span id="photoBadge" class="badge-n" hidden></span></button>
+          <button role="tab" data-tab="event" aria-selected="false">Event <span id="helpBadge" class="badge-n" hidden></span></button>
         </nav>
         <div class="a-user"><span id="who"></span><button type="button" id="signOut">Sign out</button></div>
       </header>
@@ -78,6 +79,17 @@
               <p class="hint">Order here is the order players walk the trail. Each location's handoff flag unlocks the next one.</p>
             </div>
             <div id="locEditor" class="loc-editor"></div>
+          </div>
+        </section>
+
+        <section id="view-event" class="a-view" hidden>
+          <div class="event-grid">
+            <div class="panel" id="evStatus"></div>
+            <div class="panel" id="evBroadcast"></div>
+            <div class="panel" id="evSafety"></div>
+            <div class="panel" id="evHelp"></div>
+            <div class="panel wide" id="evStandings"></div>
+            <div class="panel wide" id="evData"></div>
           </div>
         </section>
 
