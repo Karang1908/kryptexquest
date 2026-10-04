@@ -87,7 +87,8 @@ Deno.serve(async (req) => {
   // At the stop = within its radius (plus the phone's own accuracy, capped at 25 m) or scanned its QR in the last 15 min.
   const { data: scanned } = await admin.from('presence').select('stop_id').eq('team_id', teamId).eq('stop_id', stopId)
     .gte('at', new Date(Date.now() - 15 * 60_000).toISOString()).maybeSingle();
-  if (dist > stop.radius_m + Math.min(Math.max(acc, 0), 25) && !scanned) {
+  // The bonus question needs no location.
+  if (stop.role !== 'bonus' && dist > stop.radius_m + Math.min(Math.max(acc, 0), 25) && !scanned) {
     await miss('out_of_range');
     return json({ ok: false, error: 'You need to be at this location. Indoors? Scan the QR code posted there.' });
   }
