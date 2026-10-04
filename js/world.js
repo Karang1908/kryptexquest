@@ -58,6 +58,7 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
   function stopState(stop) {
     const status = statuses[stop.id] || 'open';
     const near = target && distanceM(target, stop) <= (stop.radius || CONFIG.defaultRadiusM);
+    if (status === 'hub') return near ? 'near' : 'hub';
     return status === 'cleared' ? 'cleared' : status === 'locked' ? 'locked' : near ? 'near' : 'open';
   }
 
