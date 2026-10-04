@@ -26,7 +26,7 @@ function fakeTeams() {
     return {
       id: `team${t}`, name, code: `D${t}M0${t}${t}`, locked: true, lockedAt: new Date(BASE + (t + 4) * 60000).toISOString(), createdAt: new Date(BASE + t * 60000).toISOString(),
       startedAt: new Date(BASE + (t + 6) * 60000).toISOString(), finishedAt: finished ? new Date(BASE + 80 * 60000).toISOString() : null,
-      hubFlags: clearedStops.map((s) => s.id), leaderId: members[0].id, lastActivity: solved.at(-1)?.at || null, solved, unlocked,
+      hubFlags: clearedStops.map((s) => s.id), discovered: regular.map((s) => s.id), leaderId: members[0].id, lastActivity: solved.at(-1)?.at || null, solved, unlocked,
       members: members.map((m, i) => ({ ...m, solves: solved.filter((s) => s.userId === m.id).length, unlocks: i === 0 ? unlocked.length : 0, wrong: (t + i * 2) % 4, lastSeen: new Date(Date.now() - ((t + i) % 3) * 30000).toISOString() })),
     };
   });
@@ -42,7 +42,7 @@ function localTeam(team, state) {
   return {
     id: team.id, name: `${team.name} (you)`, code: team.code, locked: team.locked, lockedAt: null, createdAt: new Date().toISOString(), leaderId: team.leaderId,
     startedAt: state.startedAt ? new Date(state.startedAt).toISOString() : null, finishedAt: state.finishedAt ? new Date(state.finishedAt).toISOString() : null,
-    hubFlags: state.hubFlags || [], lastActivity: solved.at(-1)?.at || null, solved,
+    hubFlags: state.hubFlags || [], discovered: [...new Set([...(state.discovered || []), ...(state.unlocked || [])])], lastActivity: solved.at(-1)?.at || null, solved,
     unlocked: (state.unlocked || []).map((stopId) => ({ stopId, userName: 'You (demo)', at: new Date().toISOString() })),
     members: team.members.map((m) => ({ id: m.id, name: m.name, email: `${m.id}@dubai.bits-pilani.ac.in`, isLeader: m.isLeader, joinedAt: new Date().toISOString(), solves: solved.filter((s) => s.userId === m.id).length, unlocks: 0, wrong: 0, lastSeen: new Date().toISOString() })),
   };
@@ -80,6 +80,7 @@ export function events({ limit, before, team, kind }, localT, state) {
     push({ at: tm.createdAt, kind: 'team_created', teamId: tm.id, teamName: tm.name, userId: tm.members[0]?.id, userName: tm.members[0]?.name, detail: tm.name });
     tm.members.slice(1).forEach((m, i) => push({ at: new Date(base + (i + 1) * 20000).toISOString(), kind: 'team_joined', teamId: tm.id, teamName: tm.name, userId: m.id, userName: m.name, detail: tm.name }));
     if (tm.locked) push({ at: tm.lockedAt || new Date(base + 120000).toISOString(), kind: 'team_locked', teamId: tm.id, teamName: tm.name, userId: tm.members[0]?.id, userName: tm.members[0]?.name, detail: `${tm.members.length} players` });
+    tm.discovered.forEach((stopId, i) => push({ at: new Date(Date.parse(tm.startedAt || tm.createdAt) + (8 + i * 9) * 60000).toISOString(), kind: 'discover', teamId: tm.id, teamName: tm.name, userName: tm.members[0]?.name, stopId, stopPlace: place(stopId), detail: 'discovered' }));
     if (tm.startedAt) push({ at: tm.startedAt, kind: 'checkin', teamId: tm.id, teamName: tm.name, userName: tm.members[0]?.name, stopId: 'base', stopPlace: place('base') });
     tm.unlocked.forEach((u) => push({ at: u.at, kind: 'unlock', teamId: tm.id, teamName: tm.name, userName: u.userName, stopId: u.stopId, stopPlace: place(u.stopId), distM: 12 + ti * 3 }));
     tm.solved.forEach((s, i) => {
@@ -108,4 +109,12 @@ export function leaderboard(team, state, content, game) {
   rows.sort((a, b) => (!a.finishedAt - !b.finishedAt) || ((a.elapsedSeconds ?? 1e12) - (b.elapsedSeconds ?? 1e12)) || (b.flags - a.flags) || (Date.parse(a.lastSolveAt || 0) - Date.parse(b.lastSolveAt || 0)));
   rows.forEach((r, i) => { r.rank = i + 1; });
   return { status: gameStatus(game || { status: 'running' }), now: new Date().toISOString(), me: team?.id ?? null, stops: (content || DEMO_STOPS).filter((s) => s.role !== 'hub').length, rows };
+}
+
+/** Invented alerts so the panel can be seen in demo mode. */
+export function alerts() {
+  return [
+    { kind: 'stalled', teamId: 'team4', teamName: 'Git Gud', minutes: 14 },
+    { kind: 'struggling', teamId: 'team2', teamName: 'Null Pointers', stopId: 'library', idx: 0, title: 'Study light', wrong: 6, minutes: 0 },
+  ];
 }
