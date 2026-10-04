@@ -21,25 +21,23 @@ Mobile-first, dark theme with Google blue/red/yellow/green accents. No build ste
 - `js/app.js`: auth gate, team screen (create / join by code / lock), HUD, nearest-stop card with direction arrow, stop bottom sheet, location permission gate, menu.
 - `js/demo-admin.js`: invented teams/players so the console can be explored without a backend.
 - `js/login-art.js`: canvas background for the sign-in screen (the theme art is generated in code; there are no image assets besides the two GLBs).
-- `supabase/migrations/0001_init.sql` (content tables, domain trigger) and `0002_teams_admin.sql` (teams, per-team progress, events log, live locations, admins, all RPCs; **0002 drops 0001's per-user progress tables**). `supabase/seed.sql` holds the sample stops (generated from `js/data.js`). `supabase/functions/verify-photo/` is the photo edge function.
+- `supabase/migrations/0001_init.sql` (content tables, domain trigger) and `0002_teams_admin.sql` (teams, per-team progress, events log, live locations, admins, all RPCs; **0002 drops 0001's per-user progress tables**), `0003` (content admin + photos), `0004` (game flow v2: base, entry modes, event control, leaderboard, admin tools), `0005` (arrival unlock instead of typing a password at the location, bonus as a question, finish = all codes handed in). `supabase/seed.sql` holds the sample stops (generated from `js/data.js`). `supabase/functions/verify-photo/` is the photo edge function.
 
-## Game flow (decided by the organisers, implemented in migration 0004)
+## Game flow (decided by the organisers; migrations 0004 + 0005)
 
-1. **Base (hub)** = the vending machine area. After teams lock in they walk there and **check in**; their clock starts and the locations appear in the base sheet, each with a **hint** (the place name stays hidden as "Location N" until discovered).
-2. **Entering a location** is gated by a flag, in one of three modes per location (`entry_mode`):
-   - `chain`: type the previous location's handoff flag while standing at the new location.
-   - `hub`: answer the location's *basic question* at the base (its answer unlocks it). Use this to break the chain.
-   - `open`: no lock.
-3. **Inside a location**: 2-3 puzzles. A *photo puzzle* shows a clue about a real object; photograph it (AI/organiser verified) and the real question appears (it is hidden server-side until then); its answer is a flag. A *flag puzzle* shows its question directly.
-4. **Clearing a location** reveals its handoff flag and a next clue.
-5. **Back at the base**, hand in each location's flag. When all are in, the **bonus location** is revealed (`role = bonus`). Clearing it finishes the quest (time = check-in to finish). With no bonus, handing in all flags finishes it.
+1. **Base (hub)** = the vending machine area. After teams lock in they walk there and **check in**; their clock starts and every location appears on the map as a **greyed (locked) beacon** labelled "Location N", with its hint listed in the base sheet.
+2. **Unlocking a location = walking into its radius.** No password is typed at the location. When a team enters the radius of a location that is *available*, the app unlocks it, buzzes, and shows "🔓 Location unlocked". If it is not available yet, a banner says "You must unlock it first: hand in the code from Location N-1 at the base".
+   Availability per location (`entry_mode`): `chain` = the previous location's code has been **handed in at the base** (the first location: once the team has checked in); `hub` = unlocked by answering its basic question at the base; `open` = always available.
+3. **Inside a location**: 2-3 puzzles. A *photo puzzle* shows a clue about a real object; photograph it (AI/organiser verified) and the real question appears (hidden server-side until then); its answer is a flag. A *flag puzzle* shows its question directly.
+4. **Clearing a location** reveals its **code** (and a next clue) in the location's menu.
+5. **Hand the code in at the base** (it is "location N's secret"). That makes the next location available. **When every code is handed in the quest is finished** (the clock stops) and the finish screen appears with an **extra bonus question** (role `bonus`; needs no location and does not affect the finish time). The leaderboard ranks by finish time, then flags, and marks teams that also answered the bonus.
 
-Map behaviour: the 3D beacons show the base, unlocked/cleared locations, and a hinted location only while you stand in its radius (finding it from the hint is the game). All of this arrives through `my_progress()`; clients cannot read the stops/puzzles tables.
+Map behaviour: beacons for the base and every revealed location; locked = grey, unlocked = blue, in range = yellow, cleared = green, base = red. The bonus has no beacon. All game data arrives through `my_progress()`; clients cannot read the stops/puzzles tables.
 
 ### Managing the location-chaining problem
 A pure chain makes every team walk the same order (queues at objects) and one blocked location stalls everyone. The levers, all in the console:
-- Per-location **unlock mode**: mix chain (sequential story) with hub-mode (answer a question at the base) or open locations, so teams can be spread out or a broken link bypassed without touching code.
-- **Hint reveal** (Event tab): show every location's hint after check-in (default) or reveal each only after the previous one is cleared.
+- Per-location **unlock mode**: mix sequential locations (unlock after the previous code is handed in) with base-question locations or open ones, so teams can be spread out or a broken link bypassed without touching code.
+- **Hint reveal** (Event tab): show every location (hint + grey beacon) after check-in (default) or reveal each only after the previous one is cleared.
 - **Bypass** (Teams tab): unlock a location and mark its questions solved for one team when it is blocked (event on site, locked door, broken object).
 - **Headcount** per location on the Live map, so you can see queues forming.
 - Locations stay unlocked once opened, so teams can return, and handing in flags at the base is order-independent.
@@ -92,7 +90,7 @@ The organisers decided (2026-10) to send player photos to Ollama Cloud. Flow in 
 ## Setup for the Supabase backend
 
 1. Create a project. Auth → Providers → Google: enable, add the OAuth client from Google Cloud (authorised redirect = the Supabase callback URL). Auth → URL configuration: add the deployed site URL and `http://localhost:4173` as redirect URLs.
-2. SQL editor: run `0001_init.sql`, then `0002_teams_admin.sql`, then add yourself as an admin (see above), then your real content (copy `seed.sql` to the gitignored `supabase/seed.local.sql` and replace the sample flags/coordinates).
+2. SQL editor: run `0001_init.sql`, `0002_teams_admin.sql`, `0003_content_photos.sql`, `0004_game_flow.sql`, `0005_arrival_unlock.sql` in order, then add yourself as an admin (see above), then your real content (copy `seed.sql` to the gitignored `supabase/seed.local.sql` and replace the sample flags/coordinates).
 3. Put the project URL and anon key in `js/config.js` (the anon key is public by design).
 4. Run `0003_content_photos.sql` too (creates the private buckets `puzzle-refs` and `submissions`). Then `supabase secrets set OLLAMA_API_KEY=...` and `supabase functions deploy verify-photo`. Without the key it answers 501.
    Upload ~10 reference photos per photo question in Console -> Content before the event.
