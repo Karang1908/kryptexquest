@@ -15,11 +15,13 @@ const S = {
   started: false, viewTeam: false, polling: false,
   user: null, view: null, stops: [], progress: { team: null, solved: [], solvedBy: {}, pending: [], clues: {} },
   avatar: 'male', fix: null, gps: 'idle', world: null, loc: null,
-  openId: null, expanded: 0, photo: null, busy: false, presence: {}, mapSig: '',
+  openId: null, expanded: 0, photo: null, busy: false, presence: {}, mapSig: '', arriveTried: {}, arriving: false, lockMsg: '',
   seenAnnounce: Number(localStorage.getItem('kq-seen-announce') || 0), shownAnnounce: 0, safetyMsg: '', boardTimer: null,
 };
 let toastTimer;
 const PRESENCE_MS = 15 * 60_000;
+/** Vibrate, but only once the page has had a tap: browsers log an error for earlier attempts. */
+const buzz = (pattern) => { if (navigator.userActivation?.hasBeenActive !== false) navigator.vibrate?.(pattern); };
 
 // ---------- derived state ----------
 const isHub = (stop) => stop.role === 'hub';
@@ -30,6 +32,7 @@ const isUnlocked = (stop) => stop.state !== 'locked';
 const radiusOf = (stop) => stop.radius || CONFIG.defaultRadiusM;
 const distanceTo = (stop) => (S.fix ? distanceM(S.fix, stop) : null);
 const inRange = (stop) => {
+  if (stop.role === 'bonus') return true;                                     // the bonus question needs no location
   if (Date.now() - (S.presence[stop.id] || 0) < PRESENCE_MS) return true;      // scanned the QR posted at the stop
   const d = distanceTo(stop);
   return d !== null && d <= radiusOf(stop) + Math.min(Math.max(S.fix?.accuracy || 0, 0), 25);
@@ -39,7 +42,7 @@ const teamOf = () => S.view?.team ?? null;
 function memberName(id) { return teamOf()?.members.find((m) => m.id === id)?.name; }
 const playStops = () => S.stops.filter((s) => s.role === 'stop');
 /** The place name is a reward for discovering it; until then players only know "Location N" and a hint. */
-const stopTitle = (stop) => (stop.role === 'stop' && stop.state === 'locked' && !inRange(stop) ? `Location ${stop.ord}` : stop.place);
+const stopTitle = (stop) => (stop.role === 'stop' && stop.state === 'locked' ? `Location ${stop.ord}` : stop.place);
 
 function applyView(view) {
   S.view = view;
@@ -56,14 +59,15 @@ function applyView(view) {
   S.progress = { team: view.team, solved, solvedBy, pending, clues };
   syncWorldStops();
   renderAnnouncements();
+  syncBonusMenu();
   if (view.team?.finishedAt && localStorage.getItem('kq-finish-seen') !== view.team.id) showFinish();
 }
 
-/** Stops with a beacon on the map: the base, anything unlocked, and any hinted stop you are standing at. */
+/** Beacons on the map: the base and every revealed location. Locked ones are greyed out. The bonus question has none. */
 function syncWorldStops() {
   if (!S.world) return;
-  const visible = S.stops.filter((s) => isHub(s) || s.state !== 'locked' || inRange(s));
-  const sig = visible.map((s) => `${s.id}|${s.lat}|${s.lng}|${s.radius}|${s.icon}|${stopTitle(s)}`).join(';');
+  const visible = S.stops.filter((s) => s.role !== 'bonus');
+  const sig = visible.map((s) => `${s.id}|${s.lat}|${s.lng}|${s.radius}|${s.icon}|${stopTitle(s)}|${s.state}`).join(';');
   if (sig === S.mapSig) return;
   S.mapSig = sig;
   S.world.setStops(visible.map((s) => ({ ...s, place: stopTitle(s) })));
@@ -122,7 +126,7 @@ function renderAnnouncements() {
   banner.hidden = false;
   banner.classList.toggle('warn', latest.level === 'warn');
   $('#announceText').textContent = `📣 ${latest.message}`;
-  if (S.shownAnnounce !== latest.id) { S.shownAnnounce = latest.id; navigator.vibrate?.([120, 80, 120]); toast('New message from the organisers'); }
+  if (S.shownAnnounce !== latest.id) { S.shownAnnounce = latest.id; buzz([120, 80, 120]); toast('New message from the organisers'); }
 }
 
 function safetyCheck() {
@@ -136,7 +140,7 @@ function safetyCheck() {
   S.safetyMsg = message;
   const el = $('#safetyBanner');
   el.hidden = !message; el.textContent = message;
-  if (message) navigator.vibrate?.([200, 100, 200]);
+  if (message) buzz([200, 100, 200]);
 }
 
 // ---------- nearest target ----------
@@ -147,18 +151,16 @@ function prevCleared(stop) {
 function nearestTarget() {
   if (!S.fix || !S.view?.team?.locked) return null;
   const hub = S.stops.find(isHub);
-  const stops = S.stops.filter((s) => !isHub(s));
+  const stops = S.stops.filter((s) => s.role === 'stop');
   let pool;
   if (!S.view.started && hub) pool = [hub];
   else {
-    const open = stops.filter((s) => s.state === 'open');
-    // A hinted stop only counts once you are standing at it: finding it from the hint is the game.
-    const here = stops.filter((s) => s.state === 'locked' && inRange(s));
-    const allCleared = playStops().length > 0 && playStops().every(isComplete);
+    // Open locations to work on, plus the next one that can be unlocked by walking in. Otherwise: back to the base.
+    pool = stops.filter((s) => s.state === 'open' || (s.state === 'locked' && s.available));
+    const allCleared = stops.length > 0 && stops.every(isComplete);
     const handedAll = (S.view.hub?.entered?.length ?? 0) >= (S.view.hub?.needed ?? 0);
-    pool = [...open, ...here];
-    if (!pool.length && hub) pool = [hub];
-    if (allCleared && !handedAll && hub) pool = [hub];
+    const needsBase = stops.some((s) => isComplete(s) && !S.view.hub.entered.includes(s.id));
+    if (!pool.length || needsBase || (allCleared && !handedAll)) pool = hub ? [hub, ...pool.filter((s) => s.state === 'open')] : pool;
   }
   if (!pool.length) return null;
   return pool.map((s) => ({ stop: s, dist: distanceTo(s) })).sort((a, b) => a.dist - b.dist)[0];
@@ -173,7 +175,7 @@ function renderNear() {
   card.hidden = false;
   card.dataset.stop = stop.id;
   card.classList.toggle('in-range', here);
-  $('#nearKicker').textContent = here ? 'YOU ARE HERE · TAP TO OPEN' : isHub(stop) ? (S.view.started ? 'THE BASE' : 'CHECK IN AT THE BASE') : isUnlocked(stop) ? 'NEXT SIGNAL' : 'NEXT STOP';
+  $('#nearKicker').textContent = here ? 'YOU ARE HERE · TAP TO OPEN' : isHub(stop) ? (S.view.started ? 'THE BASE' : 'CHECK IN AT THE BASE') : isUnlocked(stop) ? 'NEXT SIGNAL' : 'NEXT LOCATION';
   $('#nearName').textContent = stopTitle(stop);
   $('#nearDist').textContent = fmtDist(dist);
   const from = S.world?.shownPosition() || S.fix;
@@ -183,6 +185,7 @@ function renderNear() {
 
 // ---------- sheets ----------
 function rangeBanner(stop) {
+  if (stop.role === 'bonus') return '';
   const range = inRange(stop);
   const sim = S.loc?.isSim();
   return range ? `<div class="range ok">✓ You're at ${esc(stopTitle(stop))}</div>`
@@ -217,14 +220,16 @@ function puzzleCard(stop, p, range) {
 
 function locationCard(stop, index, range) {
   const title = stop.state === 'locked' ? `Location ${index + 1}` : stop.place;
-  const chip = stop.state === 'cleared' ? 'CLEARED' : stop.state === 'open' ? 'UNLOCKED' : 'LOCKED';
+  const chip = stop.state === 'cleared' ? 'CLEARED' : stop.state === 'open' ? 'UNLOCKED' : stop.available ? 'READY' : 'LOCKED';
+  const handed = S.view.hub?.entered?.includes(stop.id);
   let detail;
-  if (stop.state === 'cleared') detail = `<p class="loc-note">✓ Handoff flag: <code>${esc(stop.exitFlag)}</code></p>`;
+  if (stop.state === 'cleared') detail = handed ? '<p class="loc-note">✓ Code handed in.</p>' : `<p class="loc-note">✓ Cleared. Your code: <code>${esc(stop.exitFlag)}</code>. Hand it in below to unlock the next location.</p>`;
   else if (stop.state === 'open') detail = '<p class="loc-note">Unlocked. Go there and solve its questions.</p>';
   else if (stop.entryMode === 'hub') {
     detail = `<p class="loc-hint">❓ ${esc(stop.entryQuestion)}</p>
       <form class="flag-row" data-form="hub-answer" data-stop="${esc(stop.id)}"><input class="flag-input" name="answer" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Answer" aria-label="Answer for location ${index + 1}" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Unlock</button></form>`;
-  } else detail = `<p class="loc-note">🔒 Opens with the handoff flag from ${esc(stop.prevPlace ? (S.stops.find((x) => x.place === stop.prevPlace && x.state !== 'locked') ? stop.prevPlace : 'the previous location') : 'the previous location')}. Type it when you get there.</p>`;
+  } else if (stop.available) detail = '<p class="loc-note">🔓 Ready. Find it and walk in: it unlocks automatically.</p>';
+  else detail = `<p class="loc-note">🔒 Hand in the code from Location ${stop.prevOrd} below to make this location unlockable.</p>`;
   return `<article class="stop-card ${stop.state}"><div class="loc-head"><span class="loc-num">${stop.state === 'cleared' ? '✓' : index + 1}</span><strong>${esc(title)}</strong><span class="chip-s">${chip}</span></div>
     ${stop.hint ? `<p class="loc-hint">💡 ${esc(stop.hint)}</p>` : ''}${detail}</article>`;
 }
@@ -247,12 +252,12 @@ function renderHubSheet(hub) {
     body += list.map((s, i) => locationCard(s, i, range)).join('');
     for (let i = list.length; i < needed; i += 1) body += `<article class="stop-card"><div class="loc-head"><span class="loc-num">${i + 1}</span><strong>Location ${i + 1}</strong><span class="chip-s">LOCKED</span></div><p class="loc-note">Its hint appears once you clear the location before it.</p></article>`;
     const allIn = entered.length >= needed && needed > 0;
-    body += `<div class="handin"><h3>Hand in your flags</h3>
-      <p class="loc-note">Bring each location's handoff flag back here. ${entered.length} / ${needed} handed in${allIn ? ': the bonus location is open!' : '. Hand in all of them to reveal the bonus location.'}</p>
+    body += `<div class="handin"><h3>Hand in your location codes</h3>
+      <p class="loc-note">Each cleared location gives you a code. Enter it here: it unlocks the next location. ${entered.length} / ${needed} handed in${allIn ? '. You have finished!' : '.'}</p>
       ${entered.length ? `<div class="handed">${entered.map((id) => `<span>✓ ${esc(S.stops.find((s) => s.id === id)?.place || id)}</span>`).join('')}</div>` : ''}
-      ${allIn ? '' : `<form class="flag-row" data-form="hub-flag"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{...}" aria-label="Location flag" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Hand in</button></form>`}</div>`;
-    if (bonus) body += `<article class="stop-card ${bonus.state}"><div class="loc-head"><span class="loc-num">★</span><strong>Bonus: ${esc(bonus.place)}</strong><span class="chip-s">${bonus.state === 'cleared' ? 'CLEARED' : 'OPEN'}</span></div>${bonus.hint ? `<p class="loc-hint">💡 ${esc(bonus.hint)}</p>` : ''}<p class="loc-note">${bonus.state === 'cleared' ? 'Cleared!' : 'Go there and solve its question to finish the quest.'}</p></article>`;
-    else body += '<article class="stop-card"><div class="loc-head"><span class="loc-num">★</span><strong>Bonus location</strong><span class="chip-s">SECRET</span></div><p class="loc-note">Hand in every location flag to reveal it.</p></article>';
+      ${allIn ? '' : `<form class="flag-row" data-form="hub-flag"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{...}" aria-label="Location code" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Hand in</button></form>`}</div>`;
+    if (bonus) body += `<article class="stop-card ${bonus.state}"><div class="loc-head"><span class="loc-num">★</span><strong>Bonus question</strong><span class="chip-s">${bonus.state === 'cleared' ? 'DONE' : 'OPEN'}</span></div><p class="loc-note">${bonus.state === 'cleared' ? 'Answered. Nice work!' : 'An extra question for teams that found every location.'}</p>${bonus.state === 'cleared' ? '' : '<button class="primary-button" type="button" data-action="open-bonus">Answer the bonus question</button>'}</article>`;
+    else body += '<article class="stop-card"><div class="loc-head"><span class="loc-num">★</span><strong>Bonus question</strong><span class="chip-s">SECRET</span></div><p class="loc-note">Hand in every location code to reveal it.</p></article>';
   }
   $('#sheetBody').innerHTML = `<div class="sheet-top"><span class="tag">${esc(hub.label || 'BASE')}</span><button class="close" type="button" data-action="close-sheet" aria-label="Close">×</button></div>
     <h2>${esc(hub.name)}</h2><p class="place">${esc(hub.icon)} ${esc(hub.place)}</p><p class="desc">${esc(hub.description)}</p>${rangeBanner(hub)}${body}`;
@@ -267,16 +272,17 @@ function renderStopSheet(stop) {
   let body;
   if (!unlocked && stop.entryMode === 'hub') {
     body = `<div class="gate"><h3>Unlocked at the base</h3><p>This location opens when you answer its question at the vending machine area.</p><button class="primary-button" type="button" data-action="open-hub">Open the base</button></div>`;
+  } else if (!unlocked && !stop.available) {
+    body = `<div class="gate"><h3>🔒 Locked</h3><p>You must unlock this location first: hand in the code from <b>Location ${stop.prevOrd}</b> at the base (the vending machine area). Then come back and walk in.</p><button class="primary-button" type="button" data-action="open-hub">Open the base</button></div>`;
   } else if (!unlocked) {
-    body = `<div class="gate"><h3>Location locked</h3><p>The password is the handoff flag from ${esc(stop.prevPlace || 'the previous location')}.</p>
-      <form class="flag-row" data-form="unlock"><input class="flag-input" name="gate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{PREVIOUS_FLAG}" aria-label="Location password" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Unlock</button></form></div>`;
+    body = `<div class="gate"><h3>🔓 Ready to unlock</h3><p>${range ? 'You are here: unlocking…' : 'Walk into this location and it unlocks by itself.'}</p><button class="small-action" type="button" data-action="arrive-now" ${range && !S.busy ? '' : 'disabled'}>Unlock now</button></div>`;
   } else {
     const total = stop.puzzles.length || 1;
     body = `<div class="progress"><span>SIGNALS TO DECODE</span><b>${solvedCount(stop)} / ${stop.puzzles.length}</b></div>
       <div class="bar"><i style="width:${(solvedCount(stop) / total) * 100}%"></i></div>
       <div class="puzzles">${stop.puzzles.map((p) => puzzleCard(stop, p, range)).join('')}</div>
-      ${complete && clue ? `<div class="clue">${clue.clue ? `<small>NEXT CLUE</small><strong>“${esc(clue.clue)}”</strong>` : ''}<small>HANDOFF FLAG</small><code>${esc(clue.exitFlag)}</code>
-        <p class="loc-note">${stop.role === 'bonus' ? 'Quest complete: head to the base!' : 'Keep this flag: it opens the next location, and you hand it in at the base.'}</p></div>` : ''}`;
+      ${complete && clue && clue.exitFlag ? `<div class="clue">${clue.clue ? `<small>NEXT CLUE</small><strong>“${esc(clue.clue)}”</strong>` : ''}<small>YOUR LOCATION CODE</small><code>${esc(clue.exitFlag)}</code>
+        <p class="loc-note">Take this code to the base (the vending machine area) and hand it in: that unlocks the next location.</p></div>` : ''}`;
   }
   const hintLine = !unlocked && stop.hint ? `<p class="desc"><b>💡 Hint:</b> ${esc(stop.hint)}</p>` : `<p class="desc">${esc(stop.description)}</p>`;
   $('#sheetBody').innerHTML = `<div class="sheet-top"><span class="tag">${esc(stop.label)}</span><button class="close" type="button" data-action="close-sheet" aria-label="Close">×</button></div>
@@ -317,7 +323,7 @@ function applyResult(stop, result, successMessage) {
   renderSheet(); renderHud(); renderNear();
   if (result.pending) { toast(result.message || 'Sent for review.'); return true; }
   if (now && !wasComplete && now.state === 'cleared') { confetti(); toast(now.role === 'bonus' ? 'Bonus cleared!' : 'Location cleared! Your handoff flag is ready.'); }
-  else toast(successMessage);
+  else if (successMessage) toast(successMessage);
   return true;
 }
 
@@ -332,6 +338,8 @@ document.addEventListener('click', async (event) => {
   if (action === 'teleport' && stop) { S.loc.teleport(stop); toast(`Teleported to ${stop.place}.`); }
   if (action === 'open-hub') { const hub = S.stops.find(isHub); if (hub) openStop(hub.id); }
   if (action === 'open-board') openBoard();
+  if (action === 'open-bonus') openBonus();
+  if (action === 'arrive-now' && stop && !S.busy) await tryArrive(stop, true);
   if (action === 'checkin' && stop && !S.busy) {
     S.busy = true; renderSheet();
     applyResult(stop, await api.checkIn(S.fix), 'Checked in! The locations are now visible.');
@@ -351,15 +359,17 @@ document.addEventListener('submit', async (event) => {
   if (!stop || S.busy) return;
   const kind = form.dataset.form;
   const data = new FormData(form);
-  const value = data.get({ flag: 'flag', unlock: 'gate', 'hub-answer': 'answer', 'hub-flag': 'flag' }[kind]);
+  const value = data.get({ flag: 'flag', 'hub-answer': 'answer', 'hub-flag': 'flag' }[kind]);
   if (!String(value || '').trim()) return;
   S.busy = true; renderSheet();
-  if (kind === 'unlock') applyResult(stop, await api.unlock(stop, value, S.fix), `${stop.place} unlocked.`);
-  else if (kind === 'hub-answer') { const target = stopById(form.dataset.stop); applyResult(stop, await api.hubAnswer(target, value, S.fix), 'Correct! That location is unlocked. Go find it.'); }
+  if (kind === 'hub-answer') { const target = stopById(form.dataset.stop); applyResult(stop, await api.hubAnswer(target, value, S.fix), 'Correct! That location is unlocked. Go find it.'); }
   else if (kind === 'hub-flag') {
     const result = await api.hubFlag(value, S.fix);
-    applyResult(stop, result, result.ok ? `✓ ${result.place} handed in (${result.have}/${result.need}).` : '');
-    if (result.ok && result.have >= result.need) { confetti(); toast('Every flag is in! The bonus location is revealed.'); }
+    if (!applyResult(stop, result, '')) return;
+    const finished = result.have >= result.need;
+    const next = playStops().find((s) => s.state === 'locked' && s.available);
+    if (finished) { confetti(); toast('Every code is in! You finished the quest.'); }
+    else toast(`✓ ${result.place} code accepted (${result.have}/${result.need}).${next ? ` Location ${next.ord} is now unlockable: go find it!` : ''}`);
   } else applyResult(stop, await api.submitFlag(stop, Number(form.dataset.idx), value, S.fix), 'Flag verified. One signal closer.');
 });
 
@@ -379,6 +389,40 @@ $('#announceDismiss').addEventListener('click', () => {
   if (latest) { S.seenAnnounce = latest.id; localStorage.setItem('kq-seen-announce', String(latest.id)); }
   $('#announceBanner').hidden = true;
 });
+
+// ---------- arriving at a location ----------
+/** Walking into an available location unlocks it. Locked ones tell you what is missing. */
+async function tryArrive(stop, manual = false) {
+  if (S.arriving) return;
+  S.arriving = true;
+  S.arriveTried[stop.id] = Date.now();
+  try {
+    const result = await api.arrive(stop, S.fix);
+    if (!result.ok) { if (manual) toast(result.error); return; }
+    applyView(result.view);
+    buzz([200, 100, 200]);
+    confetti();
+    toast(`🔓 Location unlocked: ${result.place || stop.place}!`);
+    renderHud(); renderNear();
+    if (!S.openId || S.openId === stop.id) openStop(stop.id);
+  } finally { S.arriving = false; }
+}
+
+function checkArrivals() {
+  if (!S.fix || !S.view?.started || S.view.game?.status !== 'running') { setLockNotice(''); return; }
+  const here = S.stops.filter((s) => s.role === 'stop' && s.state === 'locked' && s.entryMode !== 'hub' && inRange(s));
+  const ready = here.find((s) => s.available);
+  if (ready && !S.busy && Date.now() - (S.arriveTried[ready.id] || 0) > 6000) tryArrive(ready);
+  const blocked = here.find((s) => !s.available);
+  setLockNotice(blocked ? `🔒 Location ${blocked.ord} is locked. You must unlock it first: hand in the code from Location ${blocked.prevOrd} at the base.` : '');
+}
+function setLockNotice(message) {
+  if (message === S.lockMsg) return;
+  S.lockMsg = message;
+  const el = $('#lockBanner');
+  el.hidden = !message; el.textContent = message;
+  if (message) buzz(150);
+}
 
 // ---------- leaderboard, help, finish ----------
 async function renderBoard() {
@@ -404,10 +448,21 @@ async function showFinish() {
   let rank = '';
   try { const board = await api.leaderboard(); const row = board.rows.find((r) => r.teamId === team.id); if (row) rank = ` You finished <b>#${row.rank}</b> of ${board.rows.length}.`; } catch { /* the board is optional here */ }
   const took = team.startedAt ? clockText(Date.parse(team.finishedAt) - Date.parse(team.startedAt)) : '';
-  $('#finishText').innerHTML = `${esc(team.name)} cleared every location and the bonus${took ? ` in <b>${took}</b>` : ''}.${rank}`;
+  $('#finishText').innerHTML = `${esc(team.name)} unlocked and cleared every location${took ? ` in <b>${took}</b>` : ''}.${rank} A bonus question is waiting.`;
+  $('#finishBonus').hidden = !bonusStop();
   $('#finishDialog').showModal();
 }
-$('#finishDialog').addEventListener('close', openBoard);
+$('#finishDialog').addEventListener('close', () => {
+  if ($('#finishDialog').returnValue === 'bonus') openBonus(); else openBoard();
+});
+function bonusStop() { return S.stops.find((s) => s.role === 'bonus' && s.state !== 'locked'); }
+function openBonus() {
+  const bonus = bonusStop();
+  if (!bonus) { toast('The bonus question appears once every code is handed in.'); return; }
+  openStop(bonus.id);
+}
+function syncBonusMenu() { $('#bonusMenu').hidden = !bonusStop(); }
+
 
 $('#sosSend').addEventListener('click', async () => {
   const result = await api.requestHelp(S.fix, $('#sosMessage').value);
@@ -662,6 +717,7 @@ async function startGame() {
     renderHud();
     renderStatus();
     safetyCheck();
+    checkArrivals();
     // Re-render the sheet only when range flips, so typing in an input is never wiped.
     const stop = stopById(S.openId);
     if (stop && S.rangeShown !== inRange(stop) && !typingInSheet()) renderSheet();
@@ -762,6 +818,7 @@ $('#menuDialog').addEventListener('click', async (event) => {
   if (action === 'avatar') $('#avatarDialog').showModal();
   if (action === 'team') showTeamScreen(true);
   if (action === 'board') openBoard();
+  if (action === 'bonus') openBonus();
   if (action === 'sos') $('#sosDialog').showModal();
   if (action === 'help') $('#helpDialog').showModal();
   if (action === 'reset' && confirm('Reset all demo progress on this device?')) { api.resetDemo(); location.reload(); }
