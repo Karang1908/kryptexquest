@@ -6,7 +6,7 @@
 
 const EXAGGERATION = 4.2;         // a little bigger than life so he reads on a phone, but still smaller than a building
 const REAL_HEIGHT_M = 1.75;
-const STATUS_COLOR = { locked: 0x6b7390, open: 0x4285f4, near: 0xfbbc05, cleared: 0x34a853 };
+const STATUS_COLOR = { locked: 0x6b7390, open: 0x4285f4, near: 0xfbbc05, cleared: 0x34a853, hub: 0xea4335 };
 const BEAM_HEIGHT = 90;
 const CUBE_HEIGHT = 14;
 
