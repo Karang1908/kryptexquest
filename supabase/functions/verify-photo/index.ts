@@ -54,13 +54,20 @@ Deno.serve(async (req) => {
   const { data: stop } = await admin.from('stops').select('lat,lng,radius_m').eq('id', stopId).maybeSingle();
   const { data: puzzle } = await admin.from('puzzles').select('prompt,kind').eq('stop_id', stopId).eq('idx', idx).maybeSingle();
   if (!stop || !puzzle || puzzle.kind !== 'photo') return json({ ok: false, error: 'Unknown photo puzzle.' }, 400);
-  if (distanceM(lat, lng, stop.lat, stop.lng) > stop.radius_m) {
+  const dist = distanceM(lat, lng, stop.lat, stop.lng);
+  const miss = (detail: string) =>
+    admin.rpc('log_photo_miss', { p_user: auth.user.id, p_stop: stopId, p_idx: idx, p_lat: lat, p_lng: lng, p_dist: dist, p_detail: detail });
+  if (dist > stop.radius_m) {
+    await miss('out_of_range');
     return json({ ok: false, error: 'You need to be at this location.' });
   }
 
   try {
     const verdict = await judgePhoto(photo, puzzle.prompt);
-    if (!verdict.match) return json({ ok: false, error: "That doesn't look like the right object. Try another angle." });
+    if (!verdict.match) {
+      await miss('photo did not match');
+      return json({ ok: false, error: "That doesn't look like the right object. Try another angle." });
+    }
   } catch (error) {
     if ((error as Error).message === 'NOT_CONFIGURED') {
       return json({ ok: false, error: 'Photo review is not live yet. Ask an organiser.' }, 501);
@@ -69,7 +76,7 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: 'Photo review failed. Try again.' }, 502);
   }
 
-  const { data, error } = await admin.rpc('record_photo_solve', { p_user: auth.user.id, p_stop: stopId, p_idx: idx });
+  const { data, error } = await admin.rpc('record_photo_solve', { p_user: auth.user.id, p_stop: stopId, p_idx: idx, p_lat: lat, p_lng: lng });
   if (error) return json({ ok: false, error: error.message }, 500);
   return json(data);
 });
