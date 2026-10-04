@@ -207,6 +207,9 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; margin: 0; letter-spacing
 .compass #compassNeedle::after { content: ''; position: absolute; left: -7px; top: 20px; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 20px solid #aab3cc; }
 .compass[aria-pressed='true'] { border-color: var(--yellow); }
 
+/* ---------- compass prompt (iOS needs a tap) ---------- */
+.compass-enable { position: absolute; z-index: 6; left: 12px; top: calc(var(--safe-top) + 66px); font-size: 13px; font-weight: 700; border-color: var(--yellow); color: var(--yellow); }
+
 /* ---------- team screen ---------- */
 .team { display: grid; place-items: center; padding: 20px; background: radial-gradient(120% 80% at 50% 0%, #131b38 0%, var(--bg) 62%); overflow-y: auto; }
 .team-card { min-width: 0; width: min(100%, 400px); display: grid; gap: 14px; padding: 26px 22px; border-radius: 28px; background: rgba(14, 19, 34, 0.8); border: 1px solid var(--line); margin: auto; }
