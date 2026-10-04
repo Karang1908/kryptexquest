@@ -3,12 +3,13 @@ import * as api from '../js/api.js';
 import { distanceM } from '../js/geo.js';
 import { loadMapLibre, buildStyle, whenLoaded, circlePolygon, stopMarkerElement } from '../js/map-core.js';
 import { initContent, initPhotos } from './content.js';
+import { initEvent } from './event.js';
 
 const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const COLORS = ['#4285F4', '#EA4335', '#FBBC05', '#34A853'];
 const ONLINE_MS = 90_000;
-const KIND_LABEL = { team_created: 'Team created', team_joined: 'Joined team', team_left: 'Left team', team_kicked: 'Removed', team_locked: 'Team locked', unlock: 'Unlock', flag: 'Flag', photo: 'Photo', stop_moved: 'Stop moved' };
+const KIND_LABEL = { team_created: 'Team created', team_joined: 'Joined team', team_left: 'Left team', team_kicked: 'Removed', team_locked: 'Team locked', unlock: 'Unlock', flag: 'Flag', photo: 'Photo', stop_moved: 'Stop moved', checkin: 'Base check-in', hub_flag: 'Flag handed in', qr: 'QR scan', finished: 'Finished', admin_action: 'Admin action', broadcast: 'Broadcast', help: 'Help request', game: 'Event control', content: 'Content edit', photo_review: 'Photo review' };
 
 const A = {
   stops: [], live: null, teams: [], events: [], tab: 'map', skew: 0,
@@ -83,9 +84,20 @@ async function initMap() {
   A.map.addSource('radius', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   A.map.addLayer({ id: 'radius-fill', type: 'fill', source: 'radius', paint: { 'fill-color': '#FBBC05', 'fill-opacity': 0.14 } });
   A.map.addLayer({ id: 'radius-line', type: 'line', source: 'radius', paint: { 'line-color': '#FBBC05', 'line-width': 2, 'line-dasharray': [2, 2] } });
+  A.map.addSource('zones', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  A.map.addLayer({ id: 'zones-fill', type: 'fill', source: 'zones', filter: ['==', ['get', 'kind'], 'nogo'], paint: { 'fill-color': '#EA4335', 'fill-opacity': 0.22 } });
+  A.map.addLayer({ id: 'zones-line', type: 'line', source: 'zones', paint: { 'line-color': ['case', ['==', ['get', 'kind'], 'nogo'], '#EA4335', '#4285F4'], 'line-width': 2, 'line-dasharray': [3, 2] } });
+  api.adminGame().then((g) => drawZones(g.bounds, g.noGo)).catch(() => {});
   A.stops.forEach(addStopMarker);
   A.map.on('click', (e) => { if (A.relocating) setDraft({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
   renderStops();
+}
+
+function drawZones(bounds, noGo) {
+  const features = [];
+  if (bounds) features.push({ ...circlePolygon(bounds, bounds.radius), properties: { kind: 'bounds' } });
+  (noGo || []).forEach((z) => features.push({ ...circlePolygon(z, z.radius), properties: { kind: 'nogo' } }));
+  A.map.getSource('zones')?.setData({ type: 'FeatureCollection', features });
 }
 
 function addStopMarker(stop) {
@@ -128,11 +140,14 @@ function focusPlayer(id) {
 
 // ---------- stops: list + editor ----------
 const stopById = (id) => A.stops.find((s) => s.id === id);
-function renderStops() {
-  $('#stopList').innerHTML = A.stops.map((s) => `<button type="button" class="stop-row ${A.selectedStop === s.id ? 'active' : ''}" data-stop="${esc(s.id)}"><span class="ico">${esc(s.icon)}</span><span class="meta"><strong>${esc(s.place)}</strong><small>${esc(s.label)} · r ${s.radius} m</small></span></button>`).join('');
-  A.stopMarkers.forEach(({ el }, id) => el.classList.toggle('selected', id === A.selectedStop));
-  renderEditor();
+function hereCount(stop) {
+  return (A.live?.players || []).filter((p) => isOnline(p) && distanceM(p, stop) <= stop.radius).length;
 }
+function renderStopList() {
+  $('#stopList').innerHTML = A.stops.map((s) => `<button type="button" class="stop-row ${A.selectedStop === s.id ? 'active' : ''}" data-stop="${esc(s.id)}"><span class="ico">${esc(s.icon)}</span><span class="meta"><strong>${esc(s.place)}${s.role === 'hub' ? ' <span class="role-badge">base</span>' : s.role === 'bonus' ? ' <span class="role-badge">bonus</span>' : ''}</strong><small>${esc(s.label)} · r ${s.radius} m${hereCount(s) ? ` · <b style="color:var(--green)">${hereCount(s)} here now</b>` : ''}</small></span></button>`).join('');
+  A.stopMarkers.forEach(({ el }, id) => el.classList.toggle('selected', id === A.selectedStop));
+}
+function renderStops() { renderStopList(); renderEditor(); }
 
 function selectStop(id) {
   if (A.relocating) cancelEdit();
@@ -227,12 +242,12 @@ async function refreshLive() {
   try {
     A.live = await api.adminLive();
     A.skew = Date.parse(A.live.now) - Date.now();
-    renderCounters(); renderCoins(); renderPlayers();
+    renderCounters(); renderCoins(); renderPlayers(); renderStopList();
   } catch (error) { console.warn('live refresh failed', error); }
 }
 
 // ---------- teams ----------
-const stopsCleared = (team) => A.stops.filter((s) => s.puzzles.length && s.puzzles.every((p) => team.solved.some((x) => x.stopId === s.id && x.idx === p.idx))).length;
+const stopsCleared = (team) => A.stops.filter((s) => s.role !== 'hub' && s.puzzles.length && s.puzzles.every((p) => team.solved.some((x) => x.stopId === s.id && x.idx === p.idx))).length;
 
 async function refreshTeams() {
   try { A.teams = await api.adminTeams(); } catch (error) { console.warn(error); return; }
@@ -256,21 +271,59 @@ async function renderTeamDetail() {
   if (!t) { box.innerHTML = '<div class="empty">Pick a team to see every flag and who solved it.</div>'; return; }
   const maxSolves = Math.max(1, ...t.members.map((m) => m.solves));
   A.teamEvents = await api.adminEvents({ limit: 60, team: t.id }).catch(() => []);
-  const byStop = A.stops.map((s) => `<div class="stop-prog"><div class="head"><span>${esc(s.icon)} ${esc(s.place)}</span><span>${t.solved.filter((x) => x.stopId === s.id).length}/${s.puzzles.length}${t.unlocked.some((u) => u.stopId === s.id) || s.ord === 1 ? '' : ' · locked'}</span></div>
+  const playable = A.stops.filter((s) => s.role !== 'hub');
+  const act = (a, extra = '') => `data-act="${a}" ${extra}`;
+  const byStop = playable.map((s) => `<div class="stop-prog"><div class="head"><span>${esc(s.icon)} ${esc(s.place)}${t.hubFlags?.includes(s.id) ? ' <span class="mini">flag handed in</span>' : ''}</span><span>${t.solved.filter((x) => x.stopId === s.id).length}/${s.puzzles.length}${t.unlocked.some((u) => u.stopId === s.id) || s.entryMode === 'open' ? '' : ' · locked'}
+        <button type="button" class="mini" ${act('grant_stop', `data-stop="${esc(s.id)}"`)} title="Unlock and mark every question solved (use when a location is blocked)">bypass</button>${s.role === 'stop' && !t.hubFlags?.includes(s.id) ? `<button type="button" class="mini" ${act('grant_hub_flag', `data-stop="${esc(s.id)}"`)} title="Count this location's flag as handed in at the base">hand in</button>` : ''}</span></div>
       ${s.puzzles.map((p) => { const hit = t.solved.find((x) => x.stopId === s.id && x.idx === p.idx); return hit
-        ? `<div class="flag-line"><span class="tick">✓</span><span>${esc(p.title)} <small style="color:var(--muted)">${p.kind}</small></span><span>by <b>${esc(hit.userName)}</b></span><span class="t">${clock(hit.at)}</span></div>`
-        : `<div class="flag-line todo"><span>○</span><span>${esc(p.title)} <small>${p.kind}</small></span></div>`; }).join('')}</div>`).join('');
+        ? `<div class="flag-line"><span class="tick">✓</span><span>${esc(p.title)} <small style="color:var(--muted)">${p.kind}</small></span><span>by <b>${esc(hit.userName)}</b></span><span class="t">${clock(hit.at)} <button type="button" class="mini" ${act('revoke_puzzle', `data-stop="${esc(s.id)}" data-idx="${p.idx}"`)}>revoke</button></span></div>`
+        : `<div class="flag-line todo"><span>○</span><span>${esc(p.title)} <small>${p.kind}</small></span><span class="t"><button type="button" class="mini" ${act('grant_puzzle', `data-stop="${esc(s.id)}" data-idx="${p.idx}"`)}>mark solved</button></span></div>`; }).join('')}</div>`).join('');
+  const others = A.teams.filter((x) => x.id !== t.id);
+  const actionsPanel = `<div class="panel"><h3>ORGANISER ACTIONS</h3><div class="team-actions">
+      <button type="button" class="btn" ${act(t.locked ? 'unlock_team' : 'lock_team')}>${t.locked ? 'Unlock team (let them edit)' : 'Lock team'}</button>
+      <button type="button" class="btn" ${act('rename')}>Rename</button>
+      ${t.startedAt ? '' : `<button type="button" class="btn" ${act('check_in')}>Check in for them</button>`}
+      ${t.finishedAt ? `<button type="button" class="btn" ${act('clear_finish')}>Clear finish</button>` : ''}
+      <button type="button" class="btn danger" ${act('reset_progress')}>Reset progress</button>
+      <button type="button" class="btn danger" ${act('disband')}>Disband team</button></div>
+      <table><thead><tr><th>Member</th><th></th></tr></thead><tbody>${t.members.map((m) => `<tr><td>${esc(m.name)}${m.isLeader ? ' <span class="mini warn">leader</span>' : ''}</td><td class="team-actions"><button type="button" class="mini" ${act('remove_member', `data-user="${esc(m.id)}"`)}>remove</button>
+        ${others.length ? `<select data-move-to="${esc(m.id)}"><option value="">move to…</option>${others.map((o) => `<option value="${esc(o.id)}">${esc(o.name)}</option>`).join('')}</select>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
   box.innerHTML = `<div><h2>${esc(t.name)}</h2><div class="chips" style="margin-top:8px">
       <span class="pill">Code <b>${esc(t.code)}</b></span><span class="pill ${t.locked ? 'good' : 'warn'}">${t.locked ? `Locked ${t.lockedAt ? clock(t.lockedAt) : ''}` : 'Not locked yet'}</span>
-      <span class="pill">Flags <b>${t.solved.length}/${totalFlags()}</b></span><span class="pill">Stops cleared <b>${stopsCleared(t)}/${A.stops.length}</b></span>
+      <span class="pill">Flags <b>${t.solved.length}/${totalFlags()}</b></span><span class="pill">Locations cleared <b>${stopsCleared(t)}/${playable.length}</b></span><span class="pill">Handed in <b>${t.hubFlags?.length ?? 0}/${playable.filter((s) => s.role === 'stop').length}</b></span>
+      <span class="pill ${t.startedAt ? 'good' : 'warn'}">${t.startedAt ? `Started ${clock(t.startedAt)}` : 'Not checked in'}</span>${t.finishedAt ? `<span class="pill good">🏁 Finished ${clock(t.finishedAt)}</span>` : ''}
       <span class="pill">Wrong guesses <b>${t.members.reduce((n, m) => n + m.wrong, 0)}</b></span><span class="pill">Last activity <b>${ago(t.lastActivity)}</b></span></div></div>
     <div class="panel"><h3>PLAYER CONTRIBUTION</h3><table><thead><tr><th>Player</th><th>Flags solved</th><th>Unlocks</th><th>Wrong guesses</th><th>Last seen</th></tr></thead><tbody>
       ${t.members.map((m) => `<tr><td><b>${esc(m.name)}</b>${m.isLeader ? ' <span class="pill warn">leader</span>' : ''}<br><small style="color:var(--muted)">${esc(m.email)}</small></td>
         <td class="bar-cell">${m.solves} <small style="color:var(--muted)">(${t.solved.length ? Math.round((m.solves / t.solved.length) * 100) : 0}%)</small><div class="mini-bar"><i style="width:${(m.solves / maxSolves) * 100}%"></i></div></td>
         <td>${m.unlocks}</td><td>${m.wrong}</td><td>${ago(m.lastSeen)}</td></tr>`).join('')}</tbody></table></div>
+    ${actionsPanel}
     <div class="panel"><h3>FLAGS BY STOP</h3><div style="display:grid;gap:10px">${byStop}</div></div>
     <div class="panel"><h3>TEAM TIMELINE</h3>${eventsTable(A.teamEvents, false) || '<div class="empty">Nothing yet.</div>'}</div>`;
 }
+$('#teamDetail').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b || !A.selectedTeam) return;
+  const action = b.dataset.act;
+  const team = A.teams.find((x) => x.id === A.selectedTeam);
+  const body = { action, team: A.selectedTeam, stop: b.dataset.stop, idx: b.dataset.idx != null ? Number(b.dataset.idx) : undefined, user: b.dataset.user };
+  if (action === 'rename') { body.name = prompt('New team name', team.name); if (!body.name) return; }
+  if (action === 'reset_progress' && !confirm(`Reset ALL progress for ${team.name}? Their solves, unlocks, check-in and photos are erased.`)) return;
+  if (action === 'disband' && !confirm(`Disband ${team.name}? The team and its progress are deleted.`)) return;
+  if (action === 'grant_stop' && !confirm('Unlock this location for the team and mark all its questions solved?')) return;
+  const result = await api.adminTeamAction(body);
+  if (!result.ok) return toast(result.error || 'Could not do that.');
+  toast(result.note || 'Done.');
+  if (action === 'disband') A.selectedTeam = null;
+  await refreshTeams();
+});
+$('#teamDetail').addEventListener('change', async (e) => {
+  const sel = e.target.closest('[data-move-to]');
+  if (!sel || !sel.value) return;
+  const result = await api.adminTeamAction({ action: 'move_member', team: A.selectedTeam, user: sel.dataset.moveTo, to: sel.value });
+  toast(result.ok ? 'Moved.' : result.error);
+  await refreshTeams();
+});
 $('#teamList').addEventListener('click', (e) => { const item = e.target.closest('[data-team]'); if (item) { A.selectedTeam = item.dataset.team; renderTeamList(); renderTeamDetail(); } });
 
 // ---------- activity log ----------
@@ -321,7 +374,7 @@ $('#logSearch').addEventListener('input', (e) => { A.logFilter.q = e.target.valu
 $('#logMore').addEventListener('click', () => loadEvents(false));
 
 // ---------- content + photos tabs ----------
-let content; let photos;
+let content; let photos; let ev;
 function wireContent() {
   content = initContent({
     toast,
@@ -330,6 +383,8 @@ function wireContent() {
     onChanged: refreshStopsFromContent,
   });
   photos = initPhotos({ toast, ago, onChanged: refreshPhotoBadge });
+  ev = initEvent({ toast, ago, mapCenter: () => { const c = A.map.getCenter(); return { lat: c.lat, lng: c.lng }; }, flyTo: (lat, lng) => { switchTab('map'); A.map.flyTo({ center: [lng, lat], zoom: 19, essential: true }); }, onZonesChanged: drawZones });
+  setInterval(async () => { const n = await ev.helpCount(); const b = $('#helpBadge'); b.hidden = n === 0; b.textContent = n; if (A.tab === 'event') ev.refresh(); }, 8000);
   refreshPhotoBadge();
   setInterval(refreshPhotoBadge, 10000);
 }
@@ -350,12 +405,13 @@ async function refreshPhotoBadge() {
 function switchTab(tab) {
   A.tab = tab;
   document.querySelectorAll('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
-  ['map', 'teams', 'log', 'content', 'photos'].forEach((name) => { $(`#view-${name}`).hidden = name !== tab; });
+  ['map', 'teams', 'log', 'content', 'photos', 'event'].forEach((name) => { $(`#view-${name}`).hidden = name !== tab; });
   if (tab === 'map') A.map.resize();
   if (tab === 'teams') refreshTeams();
   if (tab === 'log') loadEvents(true);
   if (tab === 'content') content.show();
   if (tab === 'photos') photos.show();
+  if (tab === 'event') ev.show();
 }
 $('#tabs').addEventListener('click', (e) => {
   const tab = e.target.closest('[data-tab]')?.dataset.tab;
