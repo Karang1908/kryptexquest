@@ -23,6 +23,34 @@ Mobile-first, dark theme with Google blue/red/yellow/green accents. No build ste
 - `js/login-art.js`: canvas background for the sign-in screen (the theme art is generated in code; there are no image assets besides the two GLBs).
 - `supabase/migrations/0001_init.sql` (content tables, domain trigger) and `0002_teams_admin.sql` (teams, per-team progress, events log, live locations, admins, all RPCs; **0002 drops 0001's per-user progress tables**). `supabase/seed.sql` holds the sample stops (generated from `js/data.js`). `supabase/functions/verify-photo/` is the photo edge function.
 
+## Game flow (decided by the organisers, implemented in migration 0004)
+
+1. **Base (hub)** = the vending machine area. After teams lock in they walk there and **check in**; their clock starts and the locations appear in the base sheet, each with a **hint** (the place name stays hidden as "Location N" until discovered).
+2. **Entering a location** is gated by a flag, in one of three modes per location (`entry_mode`):
+   - `chain`: type the previous location's handoff flag while standing at the new location.
+   - `hub`: answer the location's *basic question* at the base (its answer unlocks it). Use this to break the chain.
+   - `open`: no lock.
+3. **Inside a location**: 2-3 puzzles. A *photo puzzle* shows a clue about a real object; photograph it (AI/organiser verified) and the real question appears (it is hidden server-side until then); its answer is a flag. A *flag puzzle* shows its question directly.
+4. **Clearing a location** reveals its handoff flag and a next clue.
+5. **Back at the base**, hand in each location's flag. When all are in, the **bonus location** is revealed (`role = bonus`). Clearing it finishes the quest (time = check-in to finish). With no bonus, handing in all flags finishes it.
+
+Map behaviour: the 3D beacons show the base, unlocked/cleared locations, and a hinted location only while you stand in its radius (finding it from the hint is the game). All of this arrives through `my_progress()`; clients cannot read the stops/puzzles tables.
+
+### Managing the location-chaining problem
+A pure chain makes every team walk the same order (queues at objects) and one blocked location stalls everyone. The levers, all in the console:
+- Per-location **unlock mode**: mix chain (sequential story) with hub-mode (answer a question at the base) or open locations, so teams can be spread out or a broken link bypassed without touching code.
+- **Hint reveal** (Event tab): show every location's hint after check-in (default) or reveal each only after the previous one is cleared.
+- **Bypass** (Teams tab): unlock a location and mark its questions solved for one team when it is blocked (event on site, locked door, broken object).
+- **Headcount** per location on the Live map, so you can see queues forming.
+- Locations stay unlocked once opened, so teams can return, and handing in flags at the base is order-independent.
+Not built (ruled out by the organisers): different routes per team, in-app hints (hints are given in person), cheat detection.
+
+### Event operations
+Event tab: start / pause / end (plus optional scheduled start and hard end), broadcast banners to everyone or one team, quest-area circle and no-go zones (players get a warning banner and buzz), help requests with location, standings, public big-screen board (`/board/`, off until switched on), CSV export (results, full log), and deletion of stored locations/photos after the event. Teams tab: lock/unlock, rename, check in, clear finish, reset progress, disband, remove or move a player, bypass a location, mark a question solved/revoke it, count a flag as handed in. Content tab: add/edit/reorder/delete the base, locations, bonus and questions (clue, photo question, answer), reference photos, per-question stats (solved by, average time, wrong guesses, photo misses), and printable QR codes.
+
+### Indoor GPS
+At a stop, "in range" means within its radius plus the phone's own accuracy (capped at 25 m), **or** having scanned the stop's printed QR in the last 15 minutes. The QR encodes `<site>/?qr=<stop>.<token>`; scanning with the phone camera opens the game and calls `scan_qr`. Print them from Console -> Content.
+
 ## Teams
 
 2-4 players, no solo. One player creates a team (gets a 6-character code), others enter it, the leader locks it in (needs >= 2). A locked team cannot be joined or left. Progress (unlocks, solves, clues) is **shared by the team**; every solve records which member did it (`solves.user_id`) for the contribution view. The game polls `my_progress` every 4 s, so teammates' solves appear and a toast names who solved what. Gameplay RPCs refuse until the team is locked.
@@ -58,8 +86,8 @@ The organisers decided (2026-10) to send player photos to Ollama Cloud. Flow in 
 ## Verification status
 
 - Verified in headless Chromium: 3D-in-map explorer with shadow, horizon and beacons, walk/turn/run via the simulator, real-geolocation tap on a beacon label and on the canvas, team create / join / demo teammate / lock, full quest flow with a shared team, moved-stop propagation from console to game (demo storage), console tabs, relocate + save, admin gating (no session / player session / admin session against a mocked Supabase). Earlier (mobile viewport): login → avatar pick → map; simulator walking changes position, animation (Walk) and facing; real geolocation (`setGeolocation`) moves the avatar and flips range; full demo flow unlock → 3 puzzles (incl. photo) → clue → next-stop unlock; location-denied gate; explore mode; desktop width.
-- Verified against a scratch Postgres 14 with stubbed Supabase roles/`auth` (0001 then 0002): domain trigger, grants, team create/join/lock rules (duplicate name, lowercase code, double join, locked team, solo lock), shared progress with attribution, distance and order gating, rate limit, photo-solve only for service role, admin RPCs forbidden for players, non-admin stop update ineffective, stop-move audit event.
-- **Not verified**: the 4-player cap and kick/leave-with-leader-handover paths (written, not exercised), concurrency, many players at once on the console, and a real Supabase project (OAuth round-trip, RPCs through PostgREST, `functions.invoke`), the `verify-photo` edge function (never deployed), real phone GPS/compass behaviour outdoors, iOS Safari.
+- Game flow v2 (0004) verified against a scratch Postgres 14: check-in gating, hub-mode and chain entry, photo-then-question gating, accuracy tolerance, QR presence, hand-in and bonus reveal, finish and ranking, pause/lobby/ended refusals, broadcast, help requests, admin team actions, anonymous board gating; the same rules in `js/demo-engine.js` pass a Node test; the full player path (check-in -> base question -> photo -> question -> chain -> QR -> hand-in -> bonus -> finish) passes in headless Chromium in demo mode. Earlier: scratch Postgres 14 with stubbed Supabase roles/`auth` (0001 then 0002): domain trigger, grants, team create/join/lock rules (duplicate name, lowercase code, double join, locked team, solo lock), shared progress with attribution, distance and order gating, rate limit, photo-solve only for service role, admin RPCs forbidden for players, non-admin stop update ineffective, stop-move audit event.
+- **Not verified**: scale (see `scripts/loadtest.mjs`, written but never run), the 4-player cap and kick/leave-with-leader-handover paths (written, not exercised), concurrency, many players at once on the console, and a real Supabase project (OAuth round-trip, RPCs through PostgREST, `functions.invoke`), the `verify-photo` edge function (never deployed), real phone GPS/compass behaviour outdoors, iOS Safari.
 
 ## Setup for the Supabase backend
 
