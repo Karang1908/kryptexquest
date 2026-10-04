@@ -31,18 +31,28 @@ export const stopClear = (content, state, id) => {
 };
 export const teamStarted = (content, state) => !hubOf(content) || Boolean(state.startedAt);
 
+/** Can walking into this location unlock it right now? (chain: the previous location's code is handed in at the base) */
+export function available(content, state, stop) {
+  if (stopOpen(content, state, stop.id)) return true;
+  if (stop.role !== 'stop') return false;
+  if (stop.entryMode === 'open') return true;
+  if (stop.entryMode !== 'chain') return false;
+  const prev = prevStop(content, stop);
+  return teamStarted(content, state) && (!prev || state.hubFlags.includes(prev.id));
+}
+
 export function inRange(content, state, stopId, pos, now = Date.now()) {
   const s = byId(content, stopId);
   if (!s) return false;
+  if (s.role === 'bonus') return true;   // the bonus question needs no location
   const near = Boolean(pos) && distanceM(pos, s) <= s.radius + Math.min(Math.max(pos.accuracy || 0, 0), 25);
   return near || now - (state.presence[stopId] || 0) < PRESENCE_MS;
 }
 
+// Finished = every location's code handed in. The bonus question is an extra and does not stop the clock.
 function checkFinish(content, state, now) {
   const needed = stopsOf(content).length;
-  const bonus = content.filter((s) => s.role === 'bonus');
-  const bonusClear = bonus.every((s) => stopClear(content, state, s.id));
-  if (state.hubFlags.length >= needed && (bonus.length === 0 || bonusClear) && !state.finishedAt) state.finishedAt = now;
+  if (needed > 0 && state.hubFlags.length >= needed && !state.finishedAt) state.finishedAt = now;
 }
 
 /** The same JSON shape the database's my_progress() returns. */
@@ -63,7 +73,7 @@ export function buildView({ content, state, game, announcements = [], team, now 
     return {
       id: s.id, ord: s.ord, name: s.name, place: s.place, label: s.label, type: s.type, icon: s.icon, lat: s.lat, lng: s.lng, radius: s.radius,
       description: s.description, role: s.role, entryMode: s.entryMode, hint: s.hint || '', entryQuestion: s.entryQuestion || null,
-      prevPlace: prevStop(content, s)?.place ?? null,
+      prevPlace: prevStop(content, s)?.place ?? null, prevOrd: prevStop(content, s)?.ord ?? null, available: available(content, state, s),
       state: cleared ? 'cleared' : open ? 'open' : 'locked', puzzleCount: s.puzzles.length,
       exitFlag: cleared ? s.exitFlag : null, nextClue: cleared ? s.nextClue : null,
       puzzles: open ? s.puzzles.map((p, idx) => {
@@ -101,18 +111,20 @@ export function checkIn(ctx) {
   return { ok: true };
 }
 
-export function unlockChain(ctx, stopId, flag) {
+/** Walking into a location unlocks it when it is available. No password is typed at the location. */
+export function arrive(ctx, stopId) {
   const err = guard(ctx); if (err) return fail(err);
   const stop = byId(ctx.content, stopId);
   if (!stop || stop.role !== 'stop') return fail('Unknown location.');
-  if (stopOpen(ctx.content, ctx.state, stopId)) return { ok: true };
+  if (stopOpen(ctx.content, ctx.state, stopId)) return { ok: true, already: true };
   if (stop.entryMode === 'hub') return fail('This location is unlocked at the base: answer its question there.');
   if (!inRange(ctx.content, ctx.state, stopId, ctx.pos, ctx.now)) return fail('You need to be at this location. Indoors? Scan the QR code posted there.');
-  const prev = prevStop(ctx.content, stop);
-  if (prev && !stopClear(ctx.content, ctx.state, prev.id)) return fail(`Clear ${prev.place} first.`);
-  if (prev && norm(flag) !== norm(prev.exitFlag)) return fail('Access denied. The previous stop holds this password.');
+  if (!available(ctx.content, ctx.state, stop)) {
+    const prev = prevStop(ctx.content, stop);
+    return fail(`Locked. Hand in the code from Location ${prev?.ord} at the base to unlock this location.`);
+  }
   ctx.state.unlocked.push(stopId);
-  return { ok: true };
+  return { ok: true, place: stop.place };
 }
 
 export function hubAnswer(ctx, stopId, answer) {
