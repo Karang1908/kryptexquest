@@ -6,7 +6,6 @@ import { createScene3D } from './scene3d.js';
 const ANIM = { idle: 'CharacterArmature|Idle', walk: 'CharacterArmature|Walk', run: 'CharacterArmature|Run' };
 // Pokémon GO camera: low, tilted far enough to show the horizon, wide field of view, explorer dead centre.
 const CAMERA = { zoom: 20.4, pitch: 64, fov: 58 };
-const VIEW_RETURN_MS = 12000;   // the camera drifts back behind the explorer after this long untouched
 const LABEL_RANGE_M = 260;
 const FEET_Y = 0.74;            // where the explorer's feet stand, as a fraction of the screen height. Fixed on purpose: tying it to the "next signal" card made the camera jump when the card appeared
 const shortestAngle = (from, to) => ((to - from + 540) % 360) - 180;
@@ -43,6 +42,8 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
   // Orbit camera: drag to swing round the explorer, drag up/down to tilt, pinch or wheel to zoom.
   // The explorer stays the fixed point; these are offsets on top of the follow camera.
   const view = { yaw: 0, pitch: CAMERA.pitch, zoom: CAMERA.zoom, touchedAt: 0, held: 0, offset: false };
+  let ringAccuracy = -99;
+  let ringAt = 0;
   let anchor = null;          // position + time of the last movement event
   let lastFixAt = 0;
   let anim = '';
@@ -78,22 +79,23 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
     if (!target) return;
     if (!shown) shown = { lat: target.lat, lng: target.lng };
 
+    const filtered = Boolean(target.filtered || target.source === 'sim');
     const moving = now < moveUntil;
     // Glide along the last velocity for up to 2.5 s so the explorer keeps walking between sparse GPS fixes.
-    const ahead = moving ? Math.min(2.5, (now - lastFixAt) / 1000) : 0;
+    const ahead = moving && !filtered ? Math.min(2.5, (now - lastFixAt) / 1000) : 0;
     const aim = { lat: target.lat + vel.lat * ahead, lng: target.lng + vel.lng * ahead };
 
     let travelHeading = null;
     if (distanceM(shown, aim) > 150) { shown = { ...aim }; }
     else {
-      const k = 1 - Math.exp(-dt / 0.45);
+      const k = 1 - Math.exp(-dt / (filtered ? 0.12 : 0.45)); // filtered fixes arrive at 10 Hz already smooth: follow them closely
       const next = { lat: shown.lat + (aim.lat - shown.lat) * k, lng: shown.lng + (aim.lng - shown.lng) * k };
       const step = distanceM(shown, next);
       if (dt > 0 && step / dt > 0.2 && step > 0.001) travelHeading = bearingDeg(shown, next);
       shown = next;
     }
 
-    if (moving) setAnim(anchor?.mps > 2.6 ? ANIM.run : ANIM.walk);
+    if (moving) setAnim((filtered ? target.speed : anchor?.mps) > 2.6 ? ANIM.run : ANIM.walk);
     else setAnim(ANIM.idle);
 
     // Facing: the phone's compass says where the player is looking; without it, face the way we walk.
@@ -108,11 +110,6 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
     else if (moving) camBearing += shortestAngle(camBearing, heading) * (1 - Math.exp(-dt / 1.1));
     camBearing = (camBearing + 360) % 360;
 
-    if (view.held === 0 && view.offset && now - view.touchedAt > VIEW_RETURN_MS) {
-      const k = 1 - Math.exp(-dt / 0.5);
-      view.yaw += shortestAngle(view.yaw, 0) * k; view.pitch += (CAMERA.pitch - view.pitch) * k; view.zoom += (CAMERA.zoom - view.zoom) * k;
-      if (Math.abs(view.yaw) < 0.5 && Math.abs(view.pitch - CAMERA.pitch) < 0.5 && Math.abs(view.zoom - CAMERA.zoom) < 0.02) resetView(true);
-    }
     const bearing = (camBearing + view.yaw + 360) % 360;
     scene3d.update({ origin: shown, heading, bearing });
     // Top padding pushes the camera's focal point down the screen so the explorer stands low, with more of the world
@@ -124,10 +121,10 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
   }
   requestAnimationFrame(frame);
 
-  function resetView(snap) {
-    if (snap) { view.yaw = 0; view.pitch = CAMERA.pitch; view.zoom = CAMERA.zoom; }
-    else view.touchedAt = -Infinity; // let the easing in frame() glide back right away
-    if (snap && view.offset) { view.offset = false; onViewChange?.(false); }
+  // The view stays wherever the player puts it; only the reset button brings it back behind the explorer.
+  function resetView() {
+    view.yaw = 0; view.pitch = CAMERA.pitch; view.zoom = CAMERA.zoom;
+    if (view.offset) { view.offset = false; onViewChange?.(false); }
   }
   function touchView() {
     view.touchedAt = performance.now();
@@ -204,9 +201,14 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
     setFix(fix) {
       const nowMs = performance.now();
       target = fix; lastFixAt = nowMs;
-      map.getSource('accuracy').setData(circlePolygon(fix, Math.min(fix.accuracy || 0, 120)));
+      // The accuracy ring is a GeoJSON update: only redo it when it visibly changed.
+      if (Math.abs((fix.accuracy || 0) - ringAccuracy) > 1.5 || nowMs - ringAt > 1500) {
+        ringAccuracy = fix.accuracy || 0; ringAt = nowMs;
+        map.getSource('accuracy').setData(circlePolygon(fix, Math.min(ringAccuracy, 120)));
+      }
       if (fix.heading != null && fix.source === 'sim' && getCompass?.() == null) heading = fix.heading;
-      // A "movement event" is >1 m away from the previous one; it starts/extends walking and sets the glide velocity.
+      if (fix.moving !== undefined) { moveUntil = fix.moving ? nowMs + 1200 : 0; return; }
+      // Legacy path (no motion info): a "movement event" is >1 m away from the previous one.
       if (!anchor) { anchor = { lat: fix.lat, lng: fix.lng, at: nowMs, mps: 0 }; return; }
       const d = distanceM(anchor, fix);
       if (d > 1.0) {
@@ -222,6 +224,6 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
     setAvatar(kind) { return scene3d.setAvatarKind(kind); },
     setNorthUp(on) { northUp = on; },
     isNorthUp: () => northUp,
-    resetView: () => resetView(false),
+    resetView,
   };
 }
