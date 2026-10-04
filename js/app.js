@@ -3,6 +3,7 @@ import * as api from './api.js';
 import { createLocation, distanceM, bearingDeg } from './geo.js';
 import { createWorld } from './world.js';
 import { createCompass } from './compass.js';
+import { createMotion } from './motion.js';
 import { compressImage } from './image.js';
 import { startLoginArt } from './login-art.js';
 
@@ -207,10 +208,11 @@ document.addEventListener('change', async (event) => {
 $('#nearCard').addEventListener('click', () => openStop($('#nearCard').dataset.stop));
 
 // ---------- location ----------
+let gpsPaintedAt = 0;
 function onFix(fix) {
   S.fix = fix;
   S.world?.setFix(fix);
-  renderGps();
+  if (performance.now() - gpsPaintedAt > 400) { gpsPaintedAt = performance.now(); renderGps(); }
 }
 function onStatus(status, detail) {
   S.gps = status;
@@ -231,7 +233,7 @@ function onStatus(status, detail) {
   $('#locEnable').hidden = status === 'insecure';
 }
 
-function syncCompassChip() { $('#compassEnable').hidden = !S.compass.needsGesture(); }
+function syncCompassChip() { $('#compassEnable').hidden = !(S.compass.needsGesture() || S.motion.needsGesture()); }
 
 function startSimulator() {
   S.loc.startSim(S.fix || CONFIG.campus);
@@ -404,10 +406,12 @@ async function enterGame(user) {
 async function startGame() {
   S.started = true;
   showScreen('game');
-  S.loc = createLocation({ onFix, onStatus });
   S.compass = createCompass();
+  S.motion = createMotion();
+  S.loc = createLocation({ onFix, onStatus, getHeading: () => S.compass.heading(), getMotion: () => S.motion.state() });
   S.compass.autoStart();
-  $('#compassEnable').hidden = !S.compass.needsGesture();
+  S.motion.autoStart();
+  $('#compassEnable').hidden = !(S.compass.needsGesture() || S.motion.needsGesture());
   try {
     S.world = await createWorld({ onStopTap: openStop, getCompass: () => S.compass.heading(), onViewChange: (offset) => { $('#viewReset').hidden = !offset; } });
   } catch (error) {
@@ -427,8 +431,8 @@ async function startGame() {
     const stop = stopById(S.openId);
     if (stop && S.rangeShown !== inRange(stop)) renderSheet();
   }, 1000);
-  // Organisers see where players are: latest position only, every ~10 s.
-  setInterval(() => { if (S.fix) api.sendLocation(S.fix).catch(() => {}); }, 10000);
+  // Organisers see where players are: latest position only, every ~5 s.
+  setInterval(() => { if (S.fix) api.sendLocation(S.fix).catch(() => {}); }, 5000);
   const needle = $('#compassNeedle');
   (function spin() { needle.style.transform = `rotate(${-(S.world.bearing() || 0)}deg)`; requestAnimationFrame(spin); })();
 
@@ -487,10 +491,10 @@ $('#teamMembers').addEventListener('click', (e) => {
   if (kick && confirm('Remove this player from the team?')) teamAction(api.kickMember(kick.dataset.id));
 });
 
-$('#locEnable').addEventListener('click', () => { S.compass.request().then(syncCompassChip); $('#locGate').hidden = true; S.loc.stopGps(); S.loc.startGps(); });
+$('#locEnable').addEventListener('click', () => { Promise.all([S.compass.request(), S.motion.request()]).then(syncCompassChip); $('#locGate').hidden = true; S.loc.stopGps(); S.loc.startGps(); });
 $('#viewReset').addEventListener('click', () => S.world?.resetView());
 $('#compassEnable').addEventListener('click', async () => {
-  const result = await S.compass.request();
+  const [result] = await Promise.all([S.compass.request(), S.motion.request()]); // both permissions inside this one tap (iOS)
   syncCompassChip();
   if (result === 'denied') toast('Compass blocked. Allow Motion & Orientation for this site in Settings.');
   if (result === 'unsupported') toast('This device has no compass.');
