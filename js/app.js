@@ -3,6 +3,7 @@ import * as api from './api.js';
 import { createLocation, distanceM, bearingDeg } from './geo.js';
 import { createWorld } from './world.js';
 import { createCompass } from './compass.js';
+import { compressImage } from './image.js';
 import { startLoginArt } from './login-art.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -85,12 +86,14 @@ function puzzleCard(stop, puzzle, range) {
   const open = S.expanded === puzzle.idx && !solved;
   const isPhoto = puzzle.kind === 'photo';
   const hasPhoto = S.photo?.id === id;
+  const pending = !solved && (S.progress.pending || []).includes(id);
   const lock = range ? '' : 'disabled';
   return `<article class="puzzle ${solved ? 'solved' : ''}">
     <button class="puzzle-head" type="button" data-action="expand" data-idx="${puzzle.idx}" aria-expanded="${open}">
       <span class="puzzle-num">${solved ? '✓' : puzzle.idx + 1}</span><strong>${esc(puzzle.title)}</strong>
-      <small>${solved ? esc(memberName(S.progress.solvedBy?.[id]) || 'CLEARED') : isPhoto ? 'PHOTO' : 'FLAG'}</small></button>
+      <small>${solved ? esc(memberName(S.progress.solvedBy?.[id]) || 'CLEARED') : pending ? 'IN REVIEW' : isPhoto ? 'PHOTO' : 'FLAG'}</small></button>
     ${open ? `<div class="puzzle-body"><p>${esc(puzzle.prompt)}</p>
+      ${isPhoto && pending ? '<div class="range far">⏳ An organiser is checking your photo. You can send another one if you like.</div>' : ''}
       ${isPhoto ? `<label class="photo-pick ${lock}">📷 ${hasPhoto ? 'Retake photo' : 'Take a photo'}<input id="photoInput" type="file" accept="image/*" capture="environment" ${lock} /></label>
         ${hasPhoto ? `<img class="photo-preview" src="${S.photo.url}" alt="Your photo" /><button class="primary-button" type="button" data-action="verify-photo" ${lock || (S.busy ? 'disabled' : '')}>${S.busy ? 'Reviewing…' : 'Send for review'}</button>` : ''}`
       : `<form class="flag-row" data-form="flag" data-idx="${puzzle.idx}"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{...}" aria-label="Flag" ${lock} /><button class="small-action" type="submit" ${lock || (S.busy ? 'disabled' : '')}>Verify</button></form>`}
@@ -122,7 +125,7 @@ function renderSheet() {
     body = `<div class="gate"><h3>Location locked</h3><p>The password is the handoff flag from the previous stop.</p>
       <form class="flag-row" data-form="unlock"><input class="flag-input" name="gate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{PREVIOUS_FLAG}" aria-label="Location password" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Unlock</button></form></div>`;
   } else {
-    body = `<div class="progress"><span>THREE SIGNALS</span><b>${solvedCount(stop)} / ${stop.puzzles.length}</b></div>
+    body = `<div class="progress"><span>SIGNALS TO DECODE</span><b>${solvedCount(stop)} / ${stop.puzzles.length}</b></div>
       <div class="bar"><i style="width:${(solvedCount(stop) / stop.puzzles.length) * 100}%"></i></div>
       <div class="puzzles">${stop.puzzles.map((p) => puzzleCard(stop, p, range)).join('')}</div>
       ${complete && clue ? `<div class="clue"><small>NEXT CLUE</small><strong>“${esc(clue.clue)}”</strong><small>HANDOFF FLAG</small><code>${esc(clue.exitFlag)}</code>${next ? '' : '<p class="win">🏁 Kryptex found. You finished the trail!</p>'}</div>` : ''}`;
@@ -148,6 +151,7 @@ function clearPhoto() { if (S.photo?.url) URL.revokeObjectURL(S.photo.url); S.ph
 function applyResult(stop, result, successMessage) {
   S.busy = false;
   if (!result.ok) { renderSheet(); toast(result.error || 'Something went wrong. Try again.'); return false; }
+  if (result.pending) { S.progress = result.progress; clearPhoto(); renderSheet(); toast(result.message || 'Sent for review.'); return true; }
   const wasComplete = isComplete(stop);
   S.progress = result.progress;
   const next = stop.puzzles.find((p) => !S.progress.solved.includes(`${stop.id}:${p.idx}`));
@@ -157,17 +161,6 @@ function applyResult(stop, result, successMessage) {
   if (!wasComplete && isComplete(stop)) { confetti(); toast('Location cleared! Your next clue is ready.'); }
   else toast(successMessage);
   return true;
-}
-
-// ---------- photo ----------
-async function compressImage(file, max = 1280) {
-  try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
-    const canvas = Object.assign(document.createElement('canvas'), { width: Math.round(bitmap.width * scale), height: Math.round(bitmap.height * scale) });
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return await new Promise((resolve) => canvas.toBlob((blob) => resolve(blob || file), 'image/jpeg', 0.82));
-  } catch { return file; }
 }
 
 // ---------- events ----------
