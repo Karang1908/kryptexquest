@@ -4,12 +4,11 @@
 //
 // Coordinates inside the scene are metres relative to the player: +x east, +y up, -z north.
 
-const EXAGGERATION = 15;          // Pokémon GO-style: the explorer is drawn much larger than life
+const EXAGGERATION = 4.2;         // a little bigger than life so he reads on a phone, but still smaller than a building
 const REAL_HEIGHT_M = 1.75;
 const STATUS_COLOR = { locked: 0x6b7390, open: 0x4285f4, near: 0xfbbc05, cleared: 0x34a853 };
-const GRID_REF = { lat: 25.13133, lng: 55.41898 }; // any fixed point: the grid stays put while the player moves
 const BEAM_HEIGHT = 90;
-const CUBE_HEIGHT = 22;
+const CUBE_HEIGHT = 14;
 
 function gradientTexture(THREE, vertical) {
   const canvas = document.createElement('canvas');
@@ -36,24 +35,6 @@ export async function createScene3D(maplibregl) {
   const world = new THREE.Group();   // everything that is positioned relative to the player
   scene.add(world);
 
-  // ----- ground grid: gives a sense of motion over the otherwise empty campus lawns -----
-  const gridMaterial = new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false,
-    uniforms: { uOffset: { value: new THREE.Vector2() }, uColor: { value: new THREE.Color(0x6a9bff) } },
-    vertexShader: 'varying vec2 vW; varying vec2 vP; uniform vec2 uOffset; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xz + uOffset; vP = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }',
-    fragmentShader: `varying vec2 vW; varying vec2 vP; uniform vec3 uColor;
-      float line(float v, float w){ float d = abs(fract(v - 0.5) - 0.5) / fwidth(v); return 1.0 - min(d / w, 1.0); }
-      void main(){
-        float fine = max(line(vW.x / 10.0, 2.5), line(vW.y / 10.0, 2.5));
-        float coarse = max(line(vW.x / 50.0, 4.0), line(vW.y / 50.0, 4.0));
-        float fade = 1.0 - smoothstep(40.0, 300.0, length(vP)); // distance must be per-fragment: a varying length() would just interpolate the corners
-        gl_FragColor = vec4(uColor, (fine * 0.30 + coarse * 0.55) * fade);
-      }`,
-  });
-  const grid = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), gridMaterial);
-  grid.rotation.x = -Math.PI / 2; grid.position.y = 0.4; // lifted a little: right at 0 it z-fights the map's ground
-  grid.frustumCulled = false;
-
   // ----- explorer -----
   const avatarRoot = new THREE.Group();
   world.add(avatarRoot);
@@ -61,7 +42,6 @@ export async function createScene3D(maplibregl) {
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05;
   const disc = new THREE.Mesh(new THREE.CircleGeometry(1.0, 64), new THREE.MeshBasicMaterial({ color: 0x4285f4, transparent: true, opacity: 0.16, depthWrite: false }));
   disc.rotation.x = -Math.PI / 2; disc.position.y = 0.04;
-  world.add(grid);
   const ringGroup = new THREE.Group();
   ringGroup.add(ring, disc);
   world.add(ringGroup);
@@ -124,16 +104,16 @@ export async function createScene3D(maplibregl) {
   function makeBeacon(stop) {
     const group = new THREE.Group();
     const color = new THREE.Color(STATUS_COLOR.open);
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, BEAM_HEIGHT, 16, 1, true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, alphaMap: beamAlpha, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, BEAM_HEIGHT, 16, 1, true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, alphaMap: beamAlpha, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     beam.position.y = BEAM_HEIGHT / 2;
-    const cube = new THREE.Mesh(new THREE.BoxGeometry(6, 6, 6), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.9, roughness: 0.35, metalness: 0.1 }));
+    const cube = new THREE.Mesh(new THREE.BoxGeometry(4.5, 4.5, 4.5), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.9, roughness: 0.35, metalness: 0.1 }));
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(cube.geometry), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
     cube.add(edges);
     const zone = new THREE.Mesh(new THREE.CircleGeometry(stop.radius || 50, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.045, depthWrite: false }));
     zone.rotation.x = -Math.PI / 2; zone.position.y = 0.03;
     const zoneEdge = new THREE.Mesh(new THREE.RingGeometry((stop.radius || 50) - 0.5, stop.radius || 50, 96), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, depthWrite: false }));
     zoneEdge.rotation.x = -Math.PI / 2; zoneEdge.position.y = 0.05;
-    const base = new THREE.Mesh(new THREE.RingGeometry(3.2, 4.4, 48), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false }));
+    const base = new THREE.Mesh(new THREE.RingGeometry(2.6, 3.4, 48), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false }));
     base.rotation.x = -Math.PI / 2; base.position.y = 0.06;
     group.add(beam, cube, zone, zoneEdge, base);
     world.add(group);
@@ -190,9 +170,6 @@ export async function createScene3D(maplibregl) {
       const lightDir = new THREE.Vector3().addScaledVector(fwd, -0.55).addScaledVector(right, 0.7).setY(1.1).normalize();
       sun.position.copy(lightDir.clone().multiplyScalar(100));
 
-      gridMaterial.uniforms.uOffset.value.set(
-        (o.lng - GRID_REF.lng) * 111320 * Math.cos((GRID_REF.lat * Math.PI) / 180),
-        -((o.lat - GRID_REF.lat) * 110574));
       ringGroup.position.set(0, 0, 0);
       const pulse = 1 + Math.sin(t * 2.4) * 0.04;
       const base = REAL_HEIGHT_M * EXAGGERATION * 0.55;
@@ -209,6 +186,11 @@ export async function createScene3D(maplibregl) {
         bk.cube.scale.setScalar(sel ? 1.25 : 1);
         bk.base.scale.setScalar(1 + Math.sin(t * 2 + bk.phase) * 0.06);
         bk.beam.visible = bk.status !== 'cleared';
+        // Fade a beacon out as the explorer walks into it, so the pillar and cube never hide the character.
+        const near = Math.min(1, Math.max(0, (Math.hypot(east, north) - 8) / 40));
+        bk.beam.material.opacity = (bk.status === 'locked' ? 0.22 : 0.55) * (0.15 + 0.85 * near);
+        bk.cube.material.transparent = true;
+        bk.cube.material.opacity = 0.3 + 0.7 * near;
       });
 
       renderer.resetState();
@@ -264,7 +246,6 @@ export async function createScene3D(maplibregl) {
         bk.beam.material.color.copy(color);
         bk.cube.material.color.copy(color); bk.cube.material.emissive.copy(color);
         bk.zone.material.color.copy(color); bk.zoneEdge.material.color.copy(color); bk.base.material.color.copy(color);
-        bk.beam.material.opacity = status === 'locked' ? 0.22 : 0.55;
       });
     },
     update(next) { Object.assign(state, next); },
