@@ -5,9 +5,10 @@ import { createScene3D } from './scene3d.js';
 
 const ANIM = { idle: 'CharacterArmature|Idle', walk: 'CharacterArmature|Walk', run: 'CharacterArmature|Run' };
 // Pokémon GO camera: low, tilted far enough to show the horizon, wide field of view, explorer dead centre.
-const CAMERA = { zoom: 19.6, pitch: 66, fov: 58 };
+const CAMERA = { zoom: 20.2, pitch: 64, fov: 58 };
 const VIEW_RETURN_MS = 12000;   // the camera drifts back behind the explorer after this long untouched
 const LABEL_RANGE_M = 260;
+const PLAYER_Y = 0.66;          // where the explorer stands on screen, as a fraction of the height from the top (Pokémon GO: lower third)
 const shortestAngle = (from, to) => ((to - from + 540) % 360) - 180;
 
 export async function createWorld({ onStopTap, getCompass, onViewChange }) {
@@ -114,7 +115,10 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
     }
     const bearing = (camBearing + view.yaw + 360) % 360;
     scene3d.update({ origin: shown, heading, bearing });
-    map.jumpTo({ center: [shown.lng, shown.lat], bearing, pitch: view.pitch, zoom: view.zoom });
+    // Top padding pushes the camera's focal point down the screen, so the explorer stands in the lower part
+    // and more of the world ahead is visible. Padding is part of the projection, so beacons and labels follow.
+    const top = Math.round(map.getCanvas().clientHeight * (2 * PLAYER_Y - 1));
+    map.jumpTo({ center: [shown.lng, shown.lat], bearing, pitch: view.pitch, zoom: view.zoom, padding: { top, bottom: 0, left: 0, right: 0 } });
     layoutLabels();
   }
   requestAnimationFrame(frame);
