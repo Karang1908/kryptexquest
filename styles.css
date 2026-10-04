@@ -59,13 +59,14 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; margin: 0; letter-spacing
 .maplibregl-ctrl-attrib { background: rgba(10, 13, 22, 0.6) !important; color: var(--muted) !important; font-size: 9px; }
 .maplibregl-ctrl-attrib a { color: var(--muted) !important; }
 
-/* The player always stands on the exact centre of the screen. */
-.player-stage { position: absolute; left: 50%; top: 50%; width: 132px; height: 160px; margin: -144px 0 0 -66px; pointer-events: none; z-index: 2; transition: opacity 0.3s; }
-.player-stage.hidden { opacity: 0; }
-.player-stage model-viewer { width: 100%; height: 100%; --poster-color: transparent; background: transparent; }
-.player-glow { position: absolute; left: 50%; bottom: 14px; width: 120px; height: 36px; margin-left: -60px; border-radius: 50%; background: radial-gradient(closest-side, rgba(66, 133, 244, 0.65), transparent); filter: blur(2px); }
-.player-ring { width: 96px; height: 96px; border-radius: 50%; border: 2px solid rgba(66, 133, 244, 0.8); background: radial-gradient(closest-side, rgba(66, 133, 244, 0.28), rgba(66, 133, 244, 0.04) 70%, transparent); animation: ring 2.4s ease-out infinite; pointer-events: none; }
-@keyframes ring { 0% { transform: scale(0.55); opacity: 0.95; } 100% { transform: scale(1.5); opacity: 0; } }
+/* Beacon labels float over the 3D layer, positioned each frame from the same camera. */
+.stop-labels { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.beacon-label { --c: var(--blue); position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px; border-radius: 999px; background: rgba(10, 13, 22, 0.82); border: 1.5px solid var(--c); color: var(--text); font-size: 12px; font-weight: 700; white-space: nowrap; will-change: transform, opacity; }
+.bl-icon { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--c); color: #0a0d16; font-size: 13px; }
+.beacon-label[data-state='locked'] { --c: #6b7390; color: var(--muted); }
+.beacon-label[data-state='near'] { --c: var(--yellow); }
+.beacon-label[data-state='cleared'] { --c: var(--green); }
+.beacon-label.selected { transform-origin: bottom center; }
 
 /* ---------- HUD ---------- */
 .hud { position: absolute; z-index: 5; top: calc(var(--safe-top) + 12px); left: 12px; right: 12px; display: flex; gap: 8px; align-items: stretch; }
@@ -201,11 +202,6 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; margin: 0; letter-spacing
 .confetti i { position: absolute; top: -10px; width: 9px; height: 14px; border-radius: 2px; animation: fall 1.8s ease-in forwards; }
 @keyframes fall { to { transform: translate(var(--dx), 105vh) rotate(540deg); opacity: 0.9; } }
 
-/* ---------- peeking (finger on the map) ---------- */
-.player-dot { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--blue); border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(66, 133, 244, 0.3); opacity: 0; transition: opacity 0.25s; }
-.game.peeking .player-dot { opacity: 1; }
-.round-btn.attention { border-color: var(--blue); color: var(--blue); box-shadow: 0 0 0 4px rgba(66, 133, 244, 0.25); animation: nudge 1.4s ease-in-out infinite; }
-@keyframes nudge { 50% { box-shadow: 0 0 0 9px rgba(66, 133, 244, 0); } }
 .compass { display: grid; place-items: center; }
 .compass #compassNeedle { width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 20px solid var(--red); position: relative; transition: transform 0.1s linear; }
 .compass #compassNeedle::after { content: ''; position: absolute; left: -7px; top: 20px; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 20px solid #aab3cc; }
