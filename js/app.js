@@ -399,7 +399,7 @@ async function startGame() {
   showScreen('game');
   S.loc = createLocation({ onFix, onStatus });
   try {
-    S.world = await createWorld({ onStopTap: openStop, onPeekChange: (peeking) => $('#recenterButton').classList.toggle('attention', peeking) });
+    S.world = await createWorld({ onStopTap: openStop });
   } catch (error) {
     console.error(error);
     S.started = false;
@@ -477,7 +477,6 @@ $('#locEnable').addEventListener('click', () => { $('#locGate').hidden = true; S
 $('#locSim').addEventListener('click', startSimulator);
 $('#simToggle').addEventListener('change', (e) => (e.target.checked ? startSimulator() : stopSimulator()));
 $('#gpsChip').addEventListener('click', () => toast(S.fix ? `${S.fix.source === 'sim' ? 'Simulated' : 'GPS'} position · accuracy ±${Math.round(S.fix.accuracy)} m` : 'Waiting for a GPS signal…'));
-$('#recenterButton').addEventListener('click', () => S.world?.recenter());
 $('#compassButton').addEventListener('click', () => {
   const on = !S.world.isNorthUp();
   S.world.setNorthUp(on);
