@@ -9,6 +9,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230a0d16'/%3E%3Crect x='12' y='14' width='40' height='9' rx='4.5' fill='%234285F4'/%3E%3Crect x='12' y='26' width='40' height='9' rx='4.5' fill='%23EA4335'/%3E%3Crect x='12' y='38' width='40' height='9' rx='4.5' fill='%23FBBC05'/%3E%3Crect x='20' y='50' width='24' height='5' rx='2.5' fill='%2334A853'/%3E%3C/svg%3E" />
     <title>Kryptex Quest · BITS Dubai</title>
+    <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -80,11 +81,7 @@
     <main id="game" class="game" hidden>
       <div id="map" class="map-canvas" aria-label="Interactive campus map"></div>
       <div class="vignette" aria-hidden="true"></div>
-
-      <div class="player-stage" aria-hidden="true">
-        <div class="player-glow"></div>
-        <model-viewer id="playerAvatar" src="./assets/player-male.glb" alt="Your explorer" autoplay animation-name="CharacterArmature|Idle" camera-orbit="180deg 76deg 4.2m" field-of-view="26deg" camera-target="0m 0.95m 0m" interaction-prompt="none" disable-zoom disable-pan disable-tap exposure="1.15" shadow-intensity="0.01" environment-image="neutral"></model-viewer>
-      </div>
+      <div id="stopLabels" class="stop-labels"></div>
 
       <header class="hud">
         <button class="chip" id="menuButton" type="button" aria-label="Open menu"><svg class="chip-logo" aria-hidden="true"><use href="#kq-logo" /></svg></button>
@@ -93,7 +90,6 @@
       </header>
 
       <div class="side-tools">
-        <button class="round-btn" id="recenterButton" type="button" aria-label="Recenter on me">⌖</button>
         <button class="round-btn compass" id="compassButton" type="button" aria-label="Lock north up" aria-pressed="false"><span id="compassNeedle" aria-hidden="true"></span></button>
       </div>
 
