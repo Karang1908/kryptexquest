@@ -64,7 +64,7 @@ export function createPositionFilter() {
       const z = toXY(lat, lng);
       const d = Math.hypot(z.e - east.p, z.n - north.p);
       const sigma = Math.sqrt(Math.max(east.P[0][0], north.P[0][0]) + r);
-      // A fix far outside what the filter expects is probably a bad fix: trust it much less rather than snap to it.
+      // A fix far outside what the filter expects is probably a bad fix: ignore it, once.
       const far = d > 4 * sigma && d > 25;
       farFixes = far ? farFixes + 1 : 0;
       // ...but if the new position keeps disagreeing (two fixes running), or is hundreds of metres away with a good
@@ -73,8 +73,8 @@ export function createPositionFilter() {
         origin = { lat, lng }; east = new Axis(0, r); north = new Axis(0, r); t = now; farFixes = 0;
         return true;
       }
-      const inflate = far ? (d / (2 * sigma)) ** 2 : 1;
-      east.updatePosition(z.e, r * inflate); north.updatePosition(z.n, r * inflate);
+      if (far) return true;                  // hold: one wild fix must not drag the estimate or its velocity
+      east.updatePosition(z.e, r); north.updatePosition(z.n, r);
       return true;
     },
 
