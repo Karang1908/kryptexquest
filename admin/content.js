@@ -79,8 +79,8 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
     if (!stop) { box.innerHTML = '<div class="empty">No locations yet. Add the base first, then the locations.</div>'; return; }
     const isHubStop = stop.role === 'hub';
     const questions = isHubStop ? '' : stop.puzzles.map((p) => questionCard(stop, p)).join('') + C.draftQuestions.filter((d) => d.stop === stop.id).map(draftCard).join('');
-    const roleOptions = ['hub', 'stop', 'bonus'].map((r) => `<option value="${r}" ${stop.role === r ? 'selected' : ''}>${{ hub: 'Base (start / hand-in point)', stop: 'Location', bonus: 'Bonus location (after all flags)' }[r]}</option>`).join('');
-    const modeOptions = [['chain', 'Previous location\'s flag, typed at this location'], ['hub', 'Answer a question at the base'], ['open', 'No lock']].map(([v, l]) => `<option value="${v}" ${stop.entryMode === v ? 'selected' : ''}>${l}</option>`).join('');
+    const roleOptions = ['hub', 'stop', 'bonus'].map((r) => `<option value="${r}" ${stop.role === r ? 'selected' : ''}>${{ hub: 'Base (start / hand-in point)', stop: 'Location', bonus: 'Bonus question (finish screen, needs no location)' }[r]}</option>`).join('');
+    const modeOptions = [['chain', 'Sequential: unlocks when players walk in, once the previous location\'s code is handed in at the base'], ['hub', 'Unlocked by answering a question at the base'], ['open', 'Always unlockable: just walk in']].map(([v, l]) => `<option value="${v}" ${stop.entryMode === v ? 'selected' : ''}>${l}</option>`).join('');
     box.innerHTML = `<div class="panel"><h3>${stop.isNew ? 'NEW LOCATION' : isHubStop ? 'BASE' : `LOCATION ${stop.ord}`}</h3>
       <div class="form-grid">
         <label class="field">ID (permanent, a-z 0-9 - _)<input id="ed-id" value="${esc(stop.id)}" ${stop.isNew ? '' : 'disabled'} placeholder="cafeteria" /></label>
@@ -95,11 +95,11 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
         ${field('ed-lat', 'LATITUDE', stop.lat)}
         ${field('ed-lng', 'LONGITUDE', stop.lng)}
         <div class="field"><span>POSITION</span><button type="button" class="btn" id="edPlace">Place on the map…</button></div>
-        ${isHubStop ? '' : `<label class="field wide">HINT SHOWN AT THE BASE (HOW PLAYERS FIND THIS PLACE)<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>`}
+        ${isHubStop || stop.role === 'bonus' ? '' : `<label class="field wide">HINT SHOWN AT THE BASE (HOW PLAYERS FIND THIS PLACE)<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>`}
         ${stop.role === 'stop' ? `<label class="field wide">HOW IS IT UNLOCKED?<select id="ed-mode">${modeOptions}</select></label>` : ''}
         ${stop.role === 'stop' && stop.entryMode === 'hub' ? `${field('ed-eq', 'BASE QUESTION (SHOWN AT THE BASE)', stop.entryQuestion || '', 'wide')}${field('ed-ea', 'ITS ANSWER (UNLOCKS THIS LOCATION)', stop.entryAnswer || '', 'wide')}` : ''}
-        ${isHubStop ? '' : field('ed-exit', stop.role === 'bonus' ? 'FINAL FLAG' : 'HANDOFF FLAG (unlocks the NEXT location and is handed in at the base)', stop.exitFlag || '', 'wide')}
-        ${isHubStop ? '' : `<label class="field wide">NEXT CLUE (SHOWN WHEN THIS LOCATION IS CLEARED)<textarea id="ed-clue">${esc(stop.nextClue || '')}</textarea></label>`}
+        ${stop.role === 'stop' ? field('ed-exit', 'LOCATION CODE (shown when cleared; handed in at the base to unlock the NEXT location)', stop.exitFlag || '', 'wide') : ''}
+        ${stop.role === 'stop' ? `<label class="field wide">NEXT CLUE (SHOWN WHEN THIS LOCATION IS CLEARED)<textarea id="ed-clue">${esc(stop.nextClue || '')}</textarea></label>` : ''}
       </div>
       <div class="btn-row"><button type="button" class="btn save" id="edSaveLoc">${stop.isNew ? 'Create location' : 'Save location'}</button>
         ${stop.isNew ? '<button type="button" class="btn" id="edCancelNew">Cancel</button>' : `<button type="button" class="btn" id="edQr">QR code</button><button type="button" class="btn danger" id="edDeleteLoc">Delete</button>`}</div></div>
