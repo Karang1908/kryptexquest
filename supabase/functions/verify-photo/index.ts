@@ -1,4 +1,4 @@
-// verify-photo: a signed-in player sends { photo, stop, idx, lat, lng }. We check they are at the stop, then ask
+// verify-photo: a signed-in player sends { photo, stop, idx, lat, lng }. We check the team has unlocked the stop, then ask
 // Gemma (Ollama Cloud) one question: does this photo show the same object as the organisers' reference photos?
 // Confident yes -> the photo stage is cleared (the question is then revealed to the team). Unsure (or the model failed) ->
 // saved for an organiser to review. No -> rejected.
@@ -84,13 +84,15 @@ Deno.serve(async (req) => {
   const dist = distanceM(lat, lng, stop.lat, stop.lng);
   const miss = (detail: string) =>
     admin.rpc('log_photo_miss', { p_user: userId, p_stop: stopId, p_idx: idx, p_lat: lat, p_lng: lng, p_dist: dist, p_detail: detail });
-  // At the stop = within its radius (plus the phone's own accuracy, capped at 25 m) or scanned its QR in the last 15 min.
-  const { data: scanned } = await admin.from('presence').select('stop_id').eq('team_id', teamId).eq('stop_id', stopId)
-    .gte('at', new Date(Date.now() - 15 * 60_000).toISOString()).maybeSingle();
-  // The bonus question needs no location.
-  if (stop.role !== 'bonus' && dist > stop.radius_m + Math.min(Math.max(acc, 0), 25) && !scanned) {
-    await miss('out_of_range');
-    return json({ ok: false, error: 'You need to be at this location. Indoors? Scan the QR code posted there.' });
+  // Once a team has unlocked a location (which needed presence) its questions can be answered from anywhere,
+  // so the only gate is that the location is unlocked. record_photo_clear checks that too.
+  const { data: unlockedRow } = await admin.from('unlocks').select('stop_id').eq('team_id', teamId).eq('stop_id', stopId).maybeSingle();
+  if (!unlockedRow && stop.role !== 'bonus' && stop.role !== 'hub') {
+    const { data: openStop } = await admin.from('stops').select('entry_mode').eq('id', stopId).maybeSingle();
+    if (openStop?.entry_mode !== 'open') {
+      await miss('locked');
+      return json({ ok: false, error: 'Unlock this location first.' });
+    }
   }
 
   // Cost and abuse limits.
