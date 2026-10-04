@@ -8,6 +8,7 @@ const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const S = {
+  started: false, viewTeam: false, polling: false,
   user: null, stops: [], progress: { unlocked: [], solved: [], clues: {} },
   avatar: 'male', fix: null, gps: 'idle', world: null, loc: null,
   openId: null, expanded: 0, photo: null, busy: false,
@@ -87,7 +88,7 @@ function puzzleCard(stop, puzzle, range) {
   return `<article class="puzzle ${solved ? 'solved' : ''}">
     <button class="puzzle-head" type="button" data-action="expand" data-idx="${puzzle.idx}" aria-expanded="${open}">
       <span class="puzzle-num">${solved ? '✓' : puzzle.idx + 1}</span><strong>${esc(puzzle.title)}</strong>
-      <small>${solved ? 'CLEARED' : isPhoto ? 'PHOTO' : 'FLAG'}</small></button>
+      <small>${solved ? esc(memberName(S.progress.solvedBy?.[id]) || 'CLEARED') : isPhoto ? 'PHOTO' : 'FLAG'}</small></button>
     ${open ? `<div class="puzzle-body"><p>${esc(puzzle.prompt)}</p>
       ${isPhoto ? `<label class="photo-pick ${lock}">📷 ${hasPhoto ? 'Retake photo' : 'Take a photo'}<input id="photoInput" type="file" accept="image/*" capture="environment" ${lock} /></label>
         ${hasPhoto ? `<img class="photo-preview" src="${S.photo.url}" alt="Your photo" /><button class="primary-button" type="button" data-action="verify-photo" ${lock || (S.busy ? 'disabled' : '')}>${S.busy ? 'Reviewing…' : 'Send for review'}</button>` : ''}`
@@ -273,9 +274,90 @@ function wireSimulator() {
   });
 }
 
+// ---------- teams ----------
+const teamOf = () => S.progress.team;
+function memberName(id) { return teamOf()?.members.find((m) => m.id === id)?.name; }
+
+function renderTeam() {
+  const team = teamOf();
+  $('#teamStart').hidden = Boolean(team);
+  $('#teamLobby').hidden = !team;
+  $('#teamBack').hidden = !team?.locked;
+  if (!team) return;
+  const leader = team.members.find((m) => m.isLeader);
+  const amLeader = team.leaderId === team.me;
+  $('#teamNameOut').textContent = team.name;
+  $('#teamCode').textContent = team.code;
+  $('#teamCount').textContent = `${team.members.length} / ${team.max} players`;
+  $('#teamMembers').innerHTML = team.members.map((m) => `<li><span class="member-av ${m.avatar === 'female' ? 'f' : ''}">${esc(m.name.slice(0, 1).toUpperCase())}</span><span class="member-name">${esc(m.name)}${m.id === team.me ? ' <em>(you)</em>' : ''}</span>${m.isLeader ? '<span class="badge">LEADER</span>' : amLeader && !team.locked ? `<button type="button" class="kick" data-action="kick" data-id="${esc(m.id)}" aria-label="Remove ${esc(m.name)}">×</button>` : ''}</li>`).join('');
+  const enough = team.members.length >= team.min;
+  $('#teamLock').hidden = !amLeader || team.locked;
+  $('#teamLock').disabled = !enough;
+  $('#teamLock').textContent = enough ? 'Lock in team' : `Need ${team.min - team.members.length} more to lock in`;
+  $('#teamLeave').hidden = team.locked;
+  $('#teamDemoMate').hidden = api.hasBackend || team.locked;
+  $('#teamShare').hidden = team.locked;
+  $('#teamStatus').textContent = team.locked ? 'LOCKED IN · let the quest begin'
+    : amLeader ? (enough ? 'Everyone here? Lock in to start. No one can join or leave after.' : `Share the code in person. Teams need ${team.min}-${team.max} players.`)
+    : `Waiting for ${leader?.name || 'the leader'} to lock the team in…`;
+}
+
+async function teamAction(promise, successMessage) {
+  const result = await promise;
+  if (!result.ok) { toast(result.error || 'Something went wrong.'); return; }
+  S.progress = result.progress;
+  if (successMessage) toast(successMessage);
+  route();
+}
+
+function showTeamScreen(viewOnly) {
+  S.viewTeam = viewOnly;
+  showScreen('team');
+  renderTeam();
+}
+
+/** Decides which screen the player belongs on, based on their team. */
+async function route() {
+  const team = teamOf();
+  if (team?.locked && !S.viewTeam) {
+    if (!S.started) await startGame();
+    else showScreen('game');
+  } else if (team?.locked) {
+    renderTeam();
+  } else {
+    S.viewTeam = false;
+    showTeamScreen(false);
+  }
+}
+
+function typingInSheet() { return document.activeElement?.closest?.('#sheet') && /INPUT|TEXTAREA/.test(document.activeElement.tagName); }
+
+function announceTeamSolves(prev, next) {
+  const fresh = next.solved.filter((id) => !prev.solved.includes(id) && next.solvedBy?.[id] !== next.team?.me);
+  if (!fresh.length) return;
+  const [stopId, idx] = fresh[0].split(':');
+  const title = stopById(stopId)?.puzzles.find((p) => p.idx === Number(idx))?.title || 'a flag';
+  toast(`${memberName(next.solvedBy?.[fresh[0]]) || 'A teammate'} solved “${title}”.`);
+}
+
+async function pollProgress() {
+  if (S.polling) return;
+  S.polling = true;
+  try {
+    const next = await api.loadProgress();
+    if (JSON.stringify(next) === JSON.stringify(S.progress)) return;
+    const prev = S.progress;
+    S.progress = next;
+    if (S.started) { announceTeamSolves(prev, next); renderHud(); renderNear(); if (!typingInSheet()) renderSheet(); }
+    if (!S.started || !$('#teamScreen').hidden || prev.team?.locked !== next.team?.locked) route();
+  } catch (error) { console.warn('progress poll failed', error); }
+  finally { S.polling = false; }
+}
+
 // ---------- boot ----------
 function showScreen(name) {
   $('#loginScreen').hidden = name !== 'login';
+  $('#teamScreen').hidden = name !== 'team';
   $('#game').hidden = name !== 'game';
 }
 
@@ -291,7 +373,6 @@ async function enterGame(user) {
     return showLogin(`Use your @${CONFIG.allowedEmailDomain} Google account to play.`);
   }
   S.user = user;
-  showScreen('game');
   try {
     const game = await api.loadGame();
     S.stops = game.stops; S.progress = game.progress;
@@ -299,6 +380,7 @@ async function enterGame(user) {
     console.error(error);
     return showLogin('Could not load the quest. Check your connection and try again.');
   }
+  api.saveProfile(user).catch(() => {});
   const saved = await api.loadAvatar().catch(() => null);
   setAvatar(saved === 'female' ? 'female' : 'male');
   $('#menuName').textContent = user.name;
@@ -307,12 +389,20 @@ async function enterGame(user) {
   $('#simToggleRow').hidden = !CONFIG.allowSimulator;
   $('#locSim').hidden = !CONFIG.allowSimulator;
   $('#modeNote').textContent = api.hasBackend ? '' : 'Demo mode: sample content, progress saved on this device only.';
+  setInterval(pollProgress, 4000);
+  await route();
+  if (!localStorage.getItem('kq-avatar')) $('#avatarDialog').showModal();
+}
 
+async function startGame() {
+  S.started = true;
+  showScreen('game');
   S.loc = createLocation({ onFix, onStatus });
   try {
-    S.world = await createWorld({ onStopTap: openStop });
+    S.world = await createWorld({ onStopTap: openStop, onPeekChange: (peeking) => $('#recenterButton').classList.toggle('attention', peeking) });
   } catch (error) {
     console.error(error);
+    S.started = false;
     toast('The live map could not load. Check your connection and reload.');
     return;
   }
@@ -327,8 +417,11 @@ async function enterGame(user) {
     const stop = stopById(S.openId);
     if (stop && S.rangeShown !== inRange(stop)) renderSheet();
   }, 1000);
+  // Organisers see where players are: latest position only, every ~10 s.
+  setInterval(() => { if (S.fix) api.sendLocation(S.fix).catch(() => {}); }, 10000);
+  const needle = $('#compassNeedle');
+  (function spin() { needle.style.transform = `rotate(${-(S.world.bearing() || 0)}deg)`; requestAnimationFrame(spin); })();
 
-  if (!localStorage.getItem('kq-avatar')) $('#avatarDialog').showModal();
   startLocation();
   navigator.wakeLock?.request('screen').catch(() => {});
   document.addEventListener('visibilitychange', () => { if (!document.hidden) navigator.wakeLock?.request('screen').catch(() => {}); });
@@ -363,18 +456,40 @@ $('#googleSignIn').addEventListener('click', async () => {
 });
 $('#demoSignIn').addEventListener('click', () => enterGame(api.signInDemo()));
 
+$('#createForm').addEventListener('submit', (e) => { e.preventDefault(); teamAction(api.createTeam(new FormData(e.target).get('team')), 'Team created. Share your code!'); });
+$('#joinForm').addEventListener('submit', (e) => { e.preventDefault(); teamAction(api.joinTeam(new FormData(e.target).get('code')), 'You joined the team.'); });
+$('#teamShare').addEventListener('click', async () => {
+  const team = teamOf();
+  const text = `Join my Kryptex Quest team "${team.name}" with code ${team.code}`;
+  if (navigator.share) { try { await navigator.share({ text }); return; } catch { /* cancelled */ } }
+  try { await navigator.clipboard.writeText(team.code); toast('Code copied.'); } catch { toast(`Your code: ${team.code}`); }
+});
+$('#teamLock').addEventListener('click', () => { if (confirm('Lock in this team? Nobody can join or leave afterwards.')) teamAction(api.lockTeam(), 'Team locked in. Good luck!'); });
+$('#teamLeave').addEventListener('click', () => { if (confirm('Leave this team?')) teamAction(api.leaveTeam(), 'You left the team.'); });
+$('#teamBack').addEventListener('click', () => { S.viewTeam = false; route(); });
+$('#teamDemoMate').addEventListener('click', () => teamAction(Promise.resolve(api.demoAddTeammate())));
+$('#teamMembers').addEventListener('click', (e) => {
+  const kick = e.target.closest('[data-action=kick]');
+  if (kick && confirm('Remove this player from the team?')) teamAction(api.kickMember(kick.dataset.id));
+});
+
 $('#locEnable').addEventListener('click', () => { $('#locGate').hidden = true; S.loc.startGps(); });
 $('#locSim').addEventListener('click', startSimulator);
 $('#simToggle').addEventListener('change', (e) => (e.target.checked ? startSimulator() : stopSimulator()));
 $('#gpsChip').addEventListener('click', () => toast(S.fix ? `${S.fix.source === 'sim' ? 'Simulated' : 'GPS'} position · accuracy ±${Math.round(S.fix.accuracy)} m` : 'Waiting for a GPS signal…'));
 $('#recenterButton').addEventListener('click', () => S.world?.recenter());
-$('#exploreButton').addEventListener('click', () => (S.world?.isFollowing() ? S.world.flyToCampus() : S.world.recenter()));
+$('#compassButton').addEventListener('click', () => {
+  const on = !S.world.isNorthUp();
+  S.world.setNorthUp(on);
+  $('#compassButton').setAttribute('aria-pressed', String(on));
+  toast(on ? 'North is up. The explorer turns instead.' : 'Camera follows behind your explorer.');
+});
 $('#menuButton').addEventListener('click', () => $('#menuDialog').showModal());
 
 document.querySelectorAll('.avatar-option').forEach((option) => option.addEventListener('click', async () => {
   setAvatar(option.dataset.avatar);
   $('#avatarDialog').close();
-  await api.saveAvatar(S.avatar, S.user).catch(() => {});
+  await api.saveProfile(S.user, S.avatar).catch(() => {});
   toast('Explorer updated.');
 }));
 
@@ -384,6 +499,7 @@ $('#menuDialog').addEventListener('click', async (event) => {
   $('#menuDialog').close();
   const action = item.dataset.menu;
   if (action === 'avatar') $('#avatarDialog').showModal();
+  if (action === 'team') showTeamScreen(true);
   if (action === 'help') $('#helpDialog').showModal();
   if (action === 'reset' && confirm('Reset all demo progress on this device?')) { api.resetDemo(); location.reload(); }
   if (action === 'signout') { await api.signOut(); location.reload(); }
