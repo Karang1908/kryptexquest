@@ -61,6 +61,7 @@
             <input name="code" class="team-input code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Team code" required />
             <button class="ghost-button" type="submit">Join with a code</button>
           </form>
+          <button class="ghost-button" id="teamRehearsal" type="button" hidden>🧪 Organisers: start a rehearsal run</button>
         </div>
         <div id="teamLobby" hidden>
           <h2 id="teamNameOut">Team</h2>
@@ -88,6 +89,9 @@
         <div class="chip stat"><small>CLEARED</small><strong id="hudProgress">0 / 4</strong><i class="dots" id="hudDots"></i></div>
         <button class="chip gps" id="gpsChip" type="button" aria-label="Location status"><span class="gps-dot"></span><span id="gpsText">GPS</span></button>
       </header>
+
+      <div class="hud-badge offline" id="offlineBadge" hidden>OFFLINE · answers are saved</div>
+      <div class="hud-badge test" id="testBadge" hidden>🧪 REHEARSAL · not on the leaderboard</div>
 
       <div class="banners" id="banners">
         <div class="banner status" id="statusBanner" hidden></div>
@@ -154,8 +158,11 @@
         <h2 id="menuName">Explorer</h2>
         <p class="dialog-note" id="menuEmail"></p>
         <div class="menu-list">
+          <div id="menuLocations" class="menu-locations" hidden></div>
           <button type="button" data-menu="avatar">Change character</button>
           <button type="button" data-menu="bonus" id="bonusMenu" hidden>★ Bonus question</button>
+          <button type="button" data-menu="recap" id="recapMenu" hidden>🏁 Team recap</button>
+          <button type="button" data-menu="rehearsal" id="rehearsalMenu" hidden>🧪 Start rehearsal (organisers)</button>
           <button type="button" data-menu="board">Leaderboard</button>
           <button type="button" data-menu="team">My team</button>
           <button type="button" data-menu="sos" class="danger">Need help?</button>
@@ -211,7 +218,18 @@
         <h2>🏁 You found every location!</h2>
         <p id="finishText" class="dialog-note" style="font-size:15px;color:var(--text)"></p>
         <button class="primary-button" value="bonus" id="finishBonus">★ Answer the bonus question</button>
+        <button class="ghost-button" value="recap" style="margin-top:8px">Our recap &amp; share card</button>
         <button class="ghost-button" value="board" style="margin-top:8px">See the leaderboard</button>
+      </form>
+    </dialog>
+
+    <dialog id="recapDialog" class="app-dialog">
+      <form method="dialog">
+        <span class="eyebrow">YOUR QUEST</span>
+        <h2 id="recapTitle">Recap</h2>
+        <div id="recapBody"></div>
+        <button class="primary-button" type="button" id="recapShare" style="margin-top:12px">Share card</button>
+        <button class="ghost-button" value="close" style="margin-top:8px">Close</button>
       </form>
     </dialog>
 
