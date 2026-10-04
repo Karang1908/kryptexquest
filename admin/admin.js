@@ -2,6 +2,7 @@ import { CONFIG } from '../js/config.js';
 import * as api from '../js/api.js';
 import { distanceM } from '../js/geo.js';
 import { loadMapLibre, buildStyle, whenLoaded, circlePolygon, stopMarkerElement } from '../js/map-core.js';
+import { initContent, initPhotos } from './content.js';
 
 const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -51,6 +52,7 @@ async function startConsole(who) {
   try { A.stops = await api.adminStops(); } catch (error) { toast('Could not load stops.'); console.error(error); }
   buildFilters();
   await initMap();
+  wireContent();
   await refreshLive();
   setInterval(refreshLive, 5000);
   setInterval(() => { if (A.tab === 'teams') refreshTeams(); if (A.tab === 'log' && $('#logLive').checked) loadEvents(true); }, 6000);
@@ -318,16 +320,46 @@ $('#logTeam').addEventListener('change', (e) => { A.logFilter.team = e.target.va
 $('#logSearch').addEventListener('input', (e) => { A.logFilter.q = e.target.value; renderLog(); });
 $('#logMore').addEventListener('click', () => loadEvents(false));
 
+// ---------- content + photos tabs ----------
+let content; let photos;
+function wireContent() {
+  content = initContent({
+    toast,
+    mapCenter: () => { const c = A.map.getCenter(); return { lat: c.lat, lng: c.lng }; },
+    placeOnMap(id) { switchTab('map'); selectStop(id); A.relocating = true; renderEditor(); toast('Click the map where this location should be, then Save.'); },
+    onChanged: refreshStopsFromContent,
+  });
+  photos = initPhotos({ toast, ago, onChanged: refreshPhotoBadge });
+  refreshPhotoBadge();
+  setInterval(refreshPhotoBadge, 10000);
+}
+async function refreshStopsFromContent() {
+  A.stops = await api.adminStops();
+  A.stopMarkers.forEach(({ marker }) => marker.remove()); A.stopMarkers.clear();
+  A.stops.forEach(addStopMarker);
+  if (A.selectedStop && !stopById(A.selectedStop)) { A.selectedStop = null; A.draft = null; }
+  renderStops(); drawRadius();
+}
+async function refreshPhotoBadge() {
+  const n = await photos.pendingCount();
+  const badge = $('#photoBadge');
+  badge.hidden = n === 0; badge.textContent = n;
+}
+
 // ---------- tabs ----------
-$('#tabs').addEventListener('click', (e) => {
-  const tab = e.target.closest('[data-tab]')?.dataset.tab;
-  if (!tab) return;
+function switchTab(tab) {
   A.tab = tab;
   document.querySelectorAll('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
-  ['map', 'teams', 'log'].forEach((name) => { $(`#view-${name}`).hidden = name !== tab; });
+  ['map', 'teams', 'log', 'content', 'photos'].forEach((name) => { $(`#view-${name}`).hidden = name !== tab; });
   if (tab === 'map') A.map.resize();
   if (tab === 'teams') refreshTeams();
   if (tab === 'log') loadEvents(true);
+  if (tab === 'content') content.show();
+  if (tab === 'photos') photos.show();
+}
+$('#tabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('[data-tab]')?.dataset.tab;
+  if (tab) switchTab(tab);
 });
 
 $('#signInButton').addEventListener('click', () => api.signInWithGoogle().catch((error) => toast(error.message)));
