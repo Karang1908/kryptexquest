@@ -35,6 +35,19 @@ Mobile-first, dark theme with Google blue/red/yellow/green accents. No build ste
 - **Activity log**: every team/unlock/flag/photo event with player, stop, result, distance from the stop at the time, and the guessed text for wrong flags; filter by event, team, free text; live refresh.
 - Players report their latest position every ~10 s (`update_my_location`, one row per player, no trail). The player UI tells them organisers can see their live location.
 
+## Organiser content management (Content tab)
+
+Organisers create, edit, reorder and delete locations; add/edit/delete flag questions and photo questions with their answers; and upload reference photos. Backed by `0003_content_photos.sql` (`admin_content`, `admin_save_stop`, `admin_delete_stop`, `admin_reorder_stops`, `admin_save_puzzle`, `admin_delete_puzzle`; every change is written to the events log as `content`). Position is set via "Place on the map…" (jumps to the Live map, click the spot, Save). A location's **handoff flag** is the password of the next location in the order. Deleting a location or question removes teams' progress on it. In demo mode the same screens edit a copy of the sample content in localStorage, which the game then plays.
+
+## Photo verification (decided: Ollama Cloud, Gemma)
+
+The organisers decided (2026-10) to send player photos to Ollama Cloud. Flow in `supabase/functions/verify-photo` (needs `OLLAMA_API_KEY`; optional `OLLAMA_MODEL` default `gemma4:31b`, `OLLAMA_URL` default `https://ollama.com/api/chat`, `PHOTO_APPROVE_AT` 0.8, `PHOTO_REVIEW_AT` 0.5):
+1. Auth, locked team, GPS within the stop's radius (server-side), at most 6 photos per team per question per 10 min, and a SHA-256 check that rejects a photo already submitted by another team.
+2. Picks up to 4 random reference photos (of the ~10 uploaded) and sends them plus the player's photo in one `/api/chat` call with a JSON-schema answer `{same_object, confidence, reason}`. Temperature 0. The prompt asks only whether the last image shows the same object in the same place, and tells the model to say no for screens, prints, or a different object of the same kind.
+3. `confidence >= 0.8` and same: solved. `0.5-0.8`, contradictory, or the model call failed: saved as **pending** for an organiser (Photos tab: player photo beside references, model reason, Approve/Reject). Below 0.5: rejected.
+4. Every photo + verdict is stored in the private `submissions` bucket and `photo_submissions` (retention is an open decision).
+`judge.ts` (prompt, JSON parsing, thresholds, reference sampling) is pure and unit-tested with plain Node (`node --experimental-strip-types`). The Ollama call, storage, and the function as a whole have **not** been run against real services.
+
 ## Rules enforced
 
 - Sign-in is Google OAuth via Supabase, restricted to `@dubai.bits-pilani.ac.in` three ways: Google's `hd` hint, a client check, and a `before insert` trigger on `auth.users` that rejects other emails (this is the one that actually enforces it).
@@ -52,7 +65,8 @@ Mobile-first, dark theme with Google blue/red/yellow/green accents. No build ste
 1. Create a project. Auth → Providers → Google: enable, add the OAuth client from Google Cloud (authorised redirect = the Supabase callback URL). Auth → URL configuration: add the deployed site URL and `http://localhost:4173` as redirect URLs.
 2. SQL editor: run `0001_init.sql`, then `0002_teams_admin.sql`, then add yourself as an admin (see above), then your real content (copy `seed.sql` to the gitignored `supabase/seed.local.sql` and replace the sample flags/coordinates).
 3. Put the project URL and anon key in `js/config.js` (the anon key is public by design).
-4. `supabase functions deploy verify-photo`. It returns 501 until a reviewer is implemented in `judgePhoto`.
+4. Run `0003_content_photos.sql` too (creates the private buckets `puzzle-refs` and `submissions`). Then `supabase secrets set OLLAMA_API_KEY=...` and `supabase functions deploy verify-photo`. Without the key it answers 501.
+   Upload ~10 reference photos per photo question in Console -> Content before the event.
 5. For the live event set `allowSimulator: false` in `js/config.js`.
 
 ## Asset sources
@@ -63,7 +77,7 @@ Mobile-first, dark theme with Google blue/red/yellow/green accents. No build ste
 ## Open decisions
 
 - Final stop list and **surveyed** coordinates and radii (current four are provisional examples: Main Lobby, Library, Academic Block, Campus Courtyard), real clues and flags, event sequence.
-- Photo review: which reviewer, whether photos may go to a third party, retention, human fallback. Nothing is sent anywhere today.
+- Photo retention and deletion after the event; tuning the 0.8 / 0.5 thresholds on real campus photos (test with real reference sets before the event).
 - Leaderboard / public scoreboard, attempt limits beyond the per-minute cap, whether organisers can add or remove stops (today they can only edit location, radius, names), retention/deletion of the events and location data after the event.
 - Hosting (needs HTTPS) and map-tile reliability on event day; consider a managed tile provider or self-hosting.
 - Mascot art; custom campus 3D models (extrude surveyed footprints or model from campus-approved plans, do not infer from imagery).
