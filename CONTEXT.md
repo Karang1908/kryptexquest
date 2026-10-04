@@ -2,36 +2,49 @@
 
 ## Product
 
-Kryptex Quest is an in-person CTF hosted by Google Developer Groups on Campus at BITS Pilani Dubai Campus, Dubai International Academic City. Players travel to campus locations, unlock each stop with a flag from the previous stop, solve three puzzles at that stop, then receive a clue and a handoff flag for the next location. Some puzzles ask players to photograph a real object. A future backend should assess the image and the player location before issuing or accepting a flag.
+Kryptex Quest is an in-person CTF hosted by Google Developer Groups on Campus at BITS Pilani Dubai Campus, Dubai International Academic City. It plays like Pokémon GO: players physically walk to campus stops, unlock a stop with the handoff flag from the previous stop, solve three puzzles there, then receive a clue and a handoff flag for the next stop. Some puzzles ask players to photograph a real object; a server should assess the photo and the player's location before accepting it. Kryptex is the GDG mascot (final mascot art is still to come).
 
-## Current prototype
+## Current build (2026-10)
 
-- Mobile-first web UI in `index.html`, `styles.css`, and `app.js`. Run with `python3 -m http.server 4173` and open `http://localhost:4173`.
-- Live campus map uses MapLibre GL JS and OpenFreeMap vector tiles. It centers at latitude `25.13133`, longitude `55.41898`, from the OpenStreetMap BITS Pilani Dubai campus feature. A clearly labeled illustrated preview appears when remote map assets do not load.
-- Four **sample** stops: Main Lobby, Library, Academic Block, Campus Courtyard. Their exact marker coordinates are **provisional**, not surveyed. Sample flags and questions are embedded client-side for UI demonstration only.
-- The unlock → three flags → next clue flow is interactive and persists progress in local storage. One sample photo question per stop accepts an image and has an explicitly simulated approval step. No image or GPS data is uploaded.
-- A stop can unlock only after all three puzzles at the previous stop are cleared. Preview hint buttons reveal sample flags after that condition is met.
-- GPS location is opt-in. Preview mode starts enabled so the interface can be explored off campus. The optional GPS distance gate is a client-side demonstration only, using a 60 m radius.
-- The two requested Poly Pizza GLBs are bundled in `assets/`. The avatar selector and map explorer overlay render them with `<model-viewer>`; CSS portraits remain as loading fallbacks. The model-viewer script loads remotely.
+Mobile-first, dark theme with Google blue/red/yellow/green accents. No build step: ES modules served statically.
+
+- `index.html`, `styles.css`, `js/*.js`. Run: `python3 -m http.server 4173`, open `http://localhost:4173`. Geolocation needs HTTPS on phones (localhost is exempt), so event day needs an HTTPS host.
+- `js/world.js`: MapLibre map (OpenFreeMap **dark** style, fetched and rewritten at runtime: navy palette, extruded `fill-extrusion` buildings), pitch 62°, zoom 18. The player is always at the exact screen centre (`.player-stage`, an HTML `<model-viewer>` overlay); the world moves under them. The map camera `jumpTo`s the smoothed position every frame, so GPS fixes glide instead of teleporting. Walk/Run/Idle animation follows smoothed speed; facing follows movement heading and map rotation. Rotating the avatar is done via `camera-orbit` theta because model-viewer 4.3.1 throws from its `orientation` setter (verified).
+- `js/geo.js`: `watchPosition` (high accuracy) with noise filtering, or a keyboard/on-screen-pad walking simulator behind the same interface. `distanceM`/`bearingDeg` helpers.
+- `js/api.js`: one interface, two backends. **Supabase** when `js/config.js` has `supabaseUrl` + `supabaseAnonKey`; otherwise **local demo** (sample content in `js/data.js`, progress in localStorage, photo review simulated and labelled as such).
+- `js/app.js`: auth gate, HUD, nearest-stop card with direction arrow, stop bottom sheet, location permission gate, menu.
+- `js/login-art.js`: canvas background for the sign-in screen (the theme art is generated in code; there are no image assets besides the two GLBs).
+- `supabase/migrations/0001_init.sql`: schema, RLS, the domain trigger, and the RPCs `my_progress`, `unlock_stop`, `submit_flag`, `record_photo_solve`. `supabase/seed.sql` holds the sample stops (generated from `js/data.js`). `supabase/functions/verify-photo/` is the photo edge function.
+
+## Rules enforced
+
+- Sign-in is Google OAuth via Supabase, restricted to `@dubai.bits-pilani.ac.in` three ways: Google's `hd` hint, a client check, and a `before insert` trigger on `auth.users` that rejects other emails (this is the one that actually enforces it).
+- Flags, handoff flags and clues never reach the client in backend mode: `stop_secrets`/`puzzle_secrets` have RLS with no policies and no grants. Unlock/submit go through security-definer functions that check order (previous stop cleared), the stop's `radius_m` against the submitted lat/lng, and a rate limit (8 wrong attempts per minute).
+- GPS from a browser can be spoofed. The server distance check is a speed bump, not anti-cheat. Photo + location together are the stronger signal once photo review is live.
+
+## Verification status
+
+- Verified in headless Chromium (mobile viewport): login → avatar pick → map; simulator walking changes position, animation (Walk) and facing; real geolocation (`setGeolocation`) moves the avatar and flips range; full demo flow unlock → 3 puzzles (incl. photo) → clue → next-stop unlock; location-denied gate; explore mode; desktop width.
+- Verified against a scratch Postgres 14 with stubbed Supabase roles/`auth`: domain trigger, RLS/grants, order gating, distance gating, flag normalisation, rate limit, photo-solve only callable by service role.
+- **Not verified**: a real Supabase project (OAuth round-trip, RPCs through PostgREST, `functions.invoke`), the `verify-photo` edge function (never deployed), real phone GPS/compass behaviour outdoors, iOS Safari.
+
+## Setup for the Supabase backend
+
+1. Create a project. Auth → Providers → Google: enable, add the OAuth client from Google Cloud (authorised redirect = the Supabase callback URL). Auth → URL configuration: add the deployed site URL and `http://localhost:4173` as redirect URLs.
+2. SQL editor: run `supabase/migrations/0001_init.sql`, then your real content (copy `seed.sql` to the gitignored `supabase/seed.local.sql` and replace the sample flags/coordinates).
+3. Put the project URL and anon key in `js/config.js` (the anon key is public by design).
+4. `supabase functions deploy verify-photo`. It returns 501 until a reviewer is implemented in `judgePhoto`.
+5. For the live event set `allowSimulator: false` in `js/config.js`.
 
 ## Asset sources
 
-- Male Adventurer by Quaternius: https://poly.pizza/m/5EGWBMpuXq — Poly Pizza page lists CC0.
-- Female Adventurer by Quaternius: https://poly.pizza/m/ZwF0K7WBmu — Poly Pizza page lists CC0.
-- Campus identity and address: https://www.bits-pilani.ac.in/contact-us
-- Campus OSM feature: https://www.openstreetmap.org/way/224330161
-- OpenFreeMap setup and attribution: https://openfreemap.org/quick_start/
+- Male Adventurer by Quaternius: https://poly.pizza/m/5EGWBMpuXq (CC0 per Poly Pizza). Female: https://poly.pizza/m/ZwF0K7WBmu. Both GLBs include Idle/Walk/Run/Wave/Interact clips.
+- Campus identity and address: https://www.bits-pilani.ac.in/contact-us. Campus OSM feature: https://www.openstreetmap.org/way/224330161. OpenFreeMap: https://openfreemap.org/quick_start/ (public instance, no SLA).
 
-## Proposed campus-map approach
+## Open decisions
 
-1. Use OSM/OpenFreeMap as the real geographic base and place quest markers using surveyed latitude/longitude. This is what the prototype starts with.
-2. Walk the campus and collect exact entrance coordinates, safe walking paths, building names, and photos. Add a small campus GeoJSON layer for accurate paths/building footprints where the public map is incomplete. Confirm that any base geometry can be used under its source license.
-3. For a Pokémon GO-style visual, draw custom low-poly building meshes or extrude surveyed footprints in MapLibre. A faithful 3D campus cannot be inferred safely from a place name or from unrelated map imagery. Model it from campus-approved plans, photos, or a manual survey.
-4. The two local GLB avatars currently render in HTML overlays. If a later version places the avatar inside the map scene, use a WebGL layer while keeping quest interactions and labels in normal HTML for accessibility and performance.
-
-## Production decisions still needed
-
-- Final stop list, exact playable coordinates, safe/publicly accessible areas, event sequence, real clues, real flags, and Kryptex mascot art.
-- Backend contract for registration, team/solo play, challenge content, flag validation, attempt limits, image upload and retention, AI review, human review fallback, and leaderboard.
-- Server-side validation of GPS and flag state. Client-side checks in the prototype are intentionally not an anti-cheat mechanism.
-- Deployment host and map tile reliability needs. OpenFreeMap public instance has no SLA; consider a managed provider or self-hosting for event day.
+- Final stop list and **surveyed** coordinates and radii (current four are provisional examples: Main Lobby, Library, Academic Block, Campus Courtyard), real clues and flags, event sequence.
+- Photo review: which reviewer, whether photos may go to a third party, retention, human fallback. Nothing is sent anywhere today.
+- Team vs solo play, leaderboard, attempt limits beyond the per-minute cap, admin tooling.
+- Hosting (needs HTTPS) and map-tile reliability on event day; consider a managed tile provider or self-hosting.
+- Mascot art; custom campus 3D models (extrude surveyed footprints or model from campus-approved plans, do not infer from imagery).
