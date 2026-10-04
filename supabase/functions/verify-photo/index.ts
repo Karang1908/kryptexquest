@@ -1,6 +1,7 @@
 // verify-photo: a signed-in player sends { photo, stop, idx, lat, lng }. We check they are at the stop, then ask
 // Gemma (Ollama Cloud) one question: does this photo show the same object as the organisers' reference photos?
-// Confident yes -> solved. Unsure (or the model failed) -> saved for an organiser to review. No -> rejected.
+// Confident yes -> the photo stage is cleared (the question is then revealed to the team). Unsure (or the model failed) ->
+// saved for an organiser to review. No -> rejected.
 // Every photo and verdict is stored, so organisers can audit and override.
 //
 // Secrets: OLLAMA_API_KEY (required). Optional: OLLAMA_MODEL (default gemma4:31b), OLLAMA_URL (default https://ollama.com/api/chat),
@@ -63,26 +64,32 @@ Deno.serve(async (req) => {
   const idx = Number(form.get('idx'));
   const lat = Number(form.get('lat'));
   const lng = Number(form.get('lng'));
+  const acc = Number(form.get('acc')) || 0;
   if (!(photo instanceof File) || !stopId || !Number.isInteger(idx) || !Number.isFinite(lat) || !Number.isFinite(lng)) {
     return json({ ok: false, error: 'Missing photo or location.' }, 400);
   }
   if (!photo.type.startsWith('image/') || photo.size > 6 * 1024 * 1024) return json({ ok: false, error: 'Send a photo under 6 MB.' }, 400);
 
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const { data: gameError } = await admin.rpc('game_error');
+  if (gameError) return json({ ok: false, error: gameError });
   const { data: membership } = await admin.from('team_members').select('team_id, teams(locked)').eq('user_id', userId).maybeSingle();
   // deno-lint-ignore no-explicit-any
   if (!membership || !(membership as any).teams?.locked) return json({ ok: false, error: 'Your team must be locked in before you can play.' });
   const teamId = membership.team_id as string;
 
-  const { data: stop } = await admin.from('stops').select('lat,lng,radius_m').eq('id', stopId).maybeSingle();
+  const { data: stop } = await admin.from('stops').select('lat,lng,radius_m,role').eq('id', stopId).maybeSingle();
   const { data: puzzle } = await admin.from('puzzles').select('prompt,kind').eq('stop_id', stopId).eq('idx', idx).maybeSingle();
   if (!stop || !puzzle || puzzle.kind !== 'photo') return json({ ok: false, error: 'Unknown photo puzzle.' }, 400);
   const dist = distanceM(lat, lng, stop.lat, stop.lng);
   const miss = (detail: string) =>
     admin.rpc('log_photo_miss', { p_user: userId, p_stop: stopId, p_idx: idx, p_lat: lat, p_lng: lng, p_dist: dist, p_detail: detail });
-  if (dist > stop.radius_m) {
+  // At the stop = within its radius (plus the phone's own accuracy, capped at 25 m) or scanned its QR in the last 15 min.
+  const { data: scanned } = await admin.from('presence').select('stop_id').eq('team_id', teamId).eq('stop_id', stopId)
+    .gte('at', new Date(Date.now() - 15 * 60_000).toISOString()).maybeSingle();
+  if (dist > stop.radius_m + Math.min(Math.max(acc, 0), 25) && !scanned) {
     await miss('out_of_range');
-    return json({ ok: false, error: 'You need to be at this location.' });
+    return json({ ok: false, error: 'You need to be at this location. Indoors? Scan the QR code posted there.' });
   }
 
   // Cost and abuse limits.
@@ -134,9 +141,9 @@ Deno.serve(async (req) => {
   });
 
   if (status === 'approved') {
-    const { data, error } = await admin.rpc('record_photo_solve', { p_user: userId, p_stop: stopId, p_idx: idx, p_lat: lat, p_lng: lng });
+    const { data, error } = await admin.rpc('record_photo_clear', { p_user: userId, p_stop: stopId, p_idx: idx, p_lat: lat, p_lng: lng });
     if (error) return json({ ok: false, error: error.message }, 500);
-    return json({ ...data, status });
+    return json({ ...data, status, cleared: true });
   }
   if (status === 'pending') {
     await miss(verdictKind === 'error' ? 'review: model unavailable' : 'review: unsure');
