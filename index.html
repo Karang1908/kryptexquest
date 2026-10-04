@@ -92,6 +92,7 @@
       <div class="banners" id="banners">
         <div class="banner status" id="statusBanner" hidden></div>
         <div class="banner announce" id="announceBanner" hidden><span id="announceText"></span><button type="button" id="announceDismiss" aria-label="Dismiss">×</button></div>
+        <div class="banner lock" id="lockBanner" hidden></div>
         <div class="banner safety" id="safetyBanner" hidden></div>
       </div>
 
@@ -154,6 +155,7 @@
         <p class="dialog-note" id="menuEmail"></p>
         <div class="menu-list">
           <button type="button" data-menu="avatar">Change character</button>
+          <button type="button" data-menu="bonus" id="bonusMenu" hidden>★ Bonus question</button>
           <button type="button" data-menu="board">Leaderboard</button>
           <button type="button" data-menu="team">My team</button>
           <button type="button" data-menu="sos" class="danger">Need help?</button>
@@ -174,9 +176,9 @@
         <ol class="guide-list">
           <li><b>Team up.</b><span>2 to 4 players. One creates the team, the rest join with its code, then the leader locks it in.</span></li>
           <li><b>Check in at the base.</b><span>Walk to the vending machine area. The locations and their hints appear. Some open with a question you answer there.</span></li>
-          <li><b>Find each location from its hint.</b><span>Other locations open with the handoff flag from the one before. Indoors with bad GPS? Scan the QR posted at the spot.</span></li>
+          <li><b>Walk into a location to unlock it.</b><span>Locations unlock in order: hand in the previous location's code at the base first. Locked ones show as grey beacons. Indoors with bad GPS? Scan the QR posted at the spot.</span></li>
           <li><b>Clue, photo, question.</b><span>Each puzzle gives a clue to a real object. Photograph it and the question appears; its answer is a flag.</span></li>
-          <li><b>Hand in every flag at the base</b><span>to reveal the bonus location. Finish it to complete the quest.</span></li>
+          <li><b>Hand in each location's code at the base.</b><span>That unlocks the next location. When every code is in, you have finished, and a bonus question appears.</span></li>
         </ol>
         <button class="primary-button" value="done">Back to the map</button>
       </form>
@@ -206,9 +208,10 @@
     <dialog id="finishDialog" class="app-dialog">
       <form method="dialog">
         <span class="eyebrow">QUEST COMPLETE</span>
-        <h2>🏁 You found the Kryptex!</h2>
+        <h2>🏁 You found every location!</h2>
         <p id="finishText" class="dialog-note" style="font-size:15px;color:var(--text)"></p>
-        <button class="primary-button" value="done">See the leaderboard</button>
+        <button class="primary-button" value="bonus" id="finishBonus">★ Answer the bonus question</button>
+        <button class="ghost-button" value="board" style="margin-top:8px">See the leaderboard</button>
       </form>
     </dialog>
 
