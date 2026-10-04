@@ -1,2 +1,2 @@
-in gdg = good boi
-not in gdg = bad boi
+- in gdg = good boi
+- not in gdg = bad boi
