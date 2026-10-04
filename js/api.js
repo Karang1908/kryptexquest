@@ -2,12 +2,13 @@ import { CONFIG } from './config.js';
 import { DEMO_STOPS } from './data.js';
 import { distanceM } from './geo.js';
 import * as demoAdmin from './demo-admin.js';
+import { compressImage, blobToDataUrl } from './image.js';
 
 // Two interchangeable backends behind one interface: Supabase (real) or localStorage (demo).
 // Progress shape: { team, unlocked: [stopId], solved: ['stopId:idx'], solvedBy: { 'stopId:idx': userId }, clues: { stopId: { clue, exitFlag } } }
 export const hasBackend = Boolean(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
 
-const KEYS = { user: 'kq-demo-user', state: 'kq-demo-state-v3', team: 'kq-demo-team', stops: 'kq-demo-stops', loc: 'kq-demo-loc' };
+const KEYS = { user: 'kq-demo-user', state: 'kq-demo-state-v3', team: 'kq-demo-team', stops: 'kq-demo-stops', loc: 'kq-demo-loc', content: 'kq-demo-content', subs: 'kq-demo-subs' };
 const norm = (value) => String(value || '').trim().toUpperCase();
 const readJson = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
 const writeJson = (key, value) => localStorage.setItem(key, JSON.stringify(value));
@@ -74,9 +75,12 @@ export async function saveProfile(user, avatar) {
 // ---------- demo backend ----------
 const demoSolvedAll = (station, solved) => station.puzzles.every((_, idx) => solved.includes(`${station.id}:${idx}`));
 
+// Demo content lives in localStorage once an organiser edits it; until then it is the sample data.
+const demoContent = () => readJson(KEYS.content, null) || structuredClone(DEMO_STOPS);
+const demoContentSave = (content) => { content.forEach((s, i) => { s.ord = i + 1; }); writeJson(KEYS.content, content); };
 function demoStops() {
   const edits = readJson(KEYS.stops, {});
-  return DEMO_STOPS.map((s) => ({ ...s, ...edits[s.id] }));
+  return demoContent().map((s) => ({ ...s, ...edits[s.id] }));
 }
 function demoProgress() {
   const saved = readJson(KEYS.state, { unlocked: [], solved: [] });
@@ -84,7 +88,7 @@ function demoProgress() {
   const empty = { team, unlocked: [], solved: [], solvedBy: {}, clues: {} };
   if (!team?.locked) return empty;
   const clues = {};
-  DEMO_STOPS.forEach((s) => { if (demoSolvedAll(s, saved.solved)) clues[s.id] = { clue: s.nextClue, exitFlag: s.exitFlag }; });
+  demoStops().forEach((s) => { if (demoSolvedAll(s, saved.solved)) clues[s.id] = { clue: s.nextClue, exitFlag: s.exitFlag }; });
   return {
     team, clues, solved: saved.solved,
     unlocked: ['lobby', ...saved.unlocked.filter((id) => id !== 'lobby')],
@@ -142,7 +146,7 @@ async function rpc(name, args = {}) {
 export async function unlock(stop, flag, pos) {
   if (hasBackend) return rpc('unlock_stop', { p_stop: stop.id, p_flag: flag, p_lat: pos?.lat ?? null, p_lng: pos?.lng ?? null });
   const demo = demoStops().find((s) => s.id === stop.id);
-  const prev = DEMO_STOPS[demo.ord - 2];
+  const prev = demoStops()[demo.ord - 2];
   const solved = readJson(KEYS.state, { solved: [] }).solved;
   const bad = demoGuard(demo, pos) || (prev && !demoSolvedAll(prev, solved) && `Clear ${prev.place} first.`);
   if (bad) return fresh({ ok: false, error: bad });
@@ -156,7 +160,7 @@ export async function submitFlag(stop, idx, flag, pos) {
   const demo = demoStops().find((s) => s.id === stop.id);
   const bad = demoGuard(demo, pos);
   if (bad) return fresh({ ok: false, error: bad });
-  if (norm(flag) !== norm(demo.puzzles[idx].flag)) return fresh({ ok: false, error: 'That flag is not quite right. Check the clue and try again.' });
+  if (norm(flag) !== norm(demo.puzzles[idx]?.flag)) return fresh({ ok: false, error: 'That flag is not quite right. Check the clue and try again.' });
   demoSave((s) => { const id = `${stop.id}:${idx}`; if (!s.solved.includes(id)) s.solved.push(id); });
   return fresh({ ok: true });
 }
@@ -256,9 +260,11 @@ export async function adminStops() {
 }
 export async function adminSaveStop(id, patch) {
   if (!hasBackend) {
-    const edits = readJson(KEYS.stops, {});
-    edits[id] = { ...edits[id], ...patch };
-    writeJson(KEYS.stops, edits);
+    const content = demoContent();
+    const stop = content.find((s) => s.id === id);
+    if (!stop) return { ok: false, error: 'Unknown location.' };
+    Object.assign(stop, Object.fromEntries(Object.entries(patch).filter(([, v]) => v != null)));
+    demoContentSave(content);
     return { ok: true };
   }
   const row = {};
@@ -288,4 +294,141 @@ export async function adminEvents({ limit = 100, before = null, team = null, kin
   const { data, error } = await (await supabase()).rpc('admin_events', { p_limit: limit, p_before: before, p_team: team, p_kind: kind });
   if (error) throw error;
   return data;
+}
+
+// ---------- admin: content (locations, questions, answers) ----------
+export async function adminContent() {
+  if (!hasBackend) {
+    return demoContent().map((s) => ({ ...s, radius: s.radius, puzzles: s.puzzles.map((p, idx) => ({ idx, title: p.title, prompt: p.prompt, kind: p.kind, flag: p.flag, refs: (p.refs || []).map((r) => ({ id: r.id, path: r.path })) })) }));
+  }
+  const { data, error } = await (await supabase()).rpc('admin_content');
+  if (error) throw error;
+  return data;
+}
+async function adminRpc(name, args) {
+  const { data, error } = await (await supabase()).rpc(name, args);
+  return error ? { ok: false, error: error.message } : data;
+}
+export async function adminSaveLocation(stop) {
+  if (hasBackend) return adminRpc('admin_save_stop', { p: stop });
+  const id = String(stop.id || '').trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9_-]{1,29}$/.test(id)) return { ok: false, error: 'Location id: 2-30 characters, a-z 0-9 - _' };
+  if (!stop.place?.trim() || !stop.name?.trim()) return { ok: false, error: 'Place name and quest title are required.' };
+  if (!stop.exitFlag?.trim() || !stop.nextClue?.trim()) return { ok: false, error: 'The handoff flag and next clue are required.' };
+  const content = demoContent();
+  const fields = { id, name: stop.name.trim(), place: stop.place.trim(), label: stop.label || 'NEW STOP', type: stop.type || 'custom', icon: stop.icon || '◆', lat: Number(stop.lat), lng: Number(stop.lng), radius: Number(stop.radius) || 50, description: stop.description || '', exitFlag: stop.exitFlag.trim(), nextClue: stop.nextClue.trim() };
+  const at = content.findIndex((s) => s.id === id);
+  if (at >= 0) content[at] = { ...content[at], ...fields }; else content.push({ ...fields, puzzles: [] });
+  demoContentSave(content);
+  return { ok: true, id };
+}
+export async function adminDeleteLocation(id) {
+  if (hasBackend) return adminRpc('admin_delete_stop', { p_id: id });
+  demoContentSave(demoContent().filter((s) => s.id !== id));
+  return { ok: true };
+}
+export async function adminReorderLocations(ids) {
+  if (hasBackend) return adminRpc('admin_reorder_stops', { p_ids: ids });
+  const by = Object.fromEntries(demoContent().map((s) => [s.id, s]));
+  demoContentSave(ids.map((id) => by[id]));
+  return { ok: true };
+}
+export async function adminSaveQuestion(q) {
+  if (hasBackend) return adminRpc('admin_save_puzzle', { p: q });
+  if (!q.title?.trim() || !q.prompt?.trim()) return { ok: false, error: 'Title and question text are required.' };
+  if (q.kind === 'flag' && !q.flag?.trim()) return { ok: false, error: 'A flag question needs its answer.' };
+  const content = demoContent();
+  const stop = content.find((s) => s.id === q.stop);
+  if (!stop) return { ok: false, error: 'Unknown location.' };
+  const row = { title: q.title.trim(), prompt: q.prompt.trim(), kind: q.kind, flag: q.kind === 'photo' ? null : q.flag.trim() };
+  let idx = q.idx;
+  if (idx == null) { stop.puzzles.push({ ...row, refs: [] }); idx = stop.puzzles.length - 1; }
+  else stop.puzzles[idx] = { ...stop.puzzles[idx], ...row };
+  demoContentSave(content);
+  return { ok: true, idx };
+}
+export async function adminDeleteQuestion(stopId, idx) {
+  if (hasBackend) {
+    const result = await adminRpc('admin_delete_puzzle', { p_stop: stopId, p_idx: idx });
+    if (result.ok && result.paths?.length) await (await supabase()).storage.from('puzzle-refs').remove(result.paths);
+    return result;
+  }
+  const content = demoContent();
+  content.find((s) => s.id === stopId)?.puzzles.splice(idx, 1);
+  demoContentSave(content);
+  return { ok: true };
+}
+
+// ---------- admin: reference photos ----------
+/** Reference photos are small on purpose (<= 1024 px): the model is shown several at once. */
+export async function adminUploadRefs(stopId, idx, files) {
+  const results = [];
+  for (const file of files) {
+    const blob = await compressImage(file, 1024, 0.8);
+    if (!hasBackend) {
+      const small = await compressImage(file, 480, 0.7);
+      const content = demoContent();
+      const puzzle = content.find((s) => s.id === stopId)?.puzzles[idx];
+      if (!puzzle) return { ok: false, error: 'Save the question first.' };
+      (puzzle.refs ||= []).push({ id: crypto.randomUUID(), path: await blobToDataUrl(small) });
+      demoContentSave(content);
+      results.push(true);
+      continue;
+    }
+    const sb = await supabase();
+    const path = `${stopId}/${idx}/${crypto.randomUUID()}.jpg`;
+    const up = await sb.storage.from('puzzle-refs').upload(path, blob, { contentType: 'image/jpeg' });
+    if (up.error) return { ok: false, error: up.error.message };
+    const row = await sb.from('photo_refs').insert({ stop_id: stopId, idx, path });
+    if (row.error) { await sb.storage.from('puzzle-refs').remove([path]); return { ok: false, error: row.error.message }; }
+    results.push(true);
+  }
+  return { ok: true, count: results.length };
+}
+export async function adminDeleteRef(stopId, idx, ref) {
+  if (!hasBackend) {
+    const content = demoContent();
+    const puzzle = content.find((s) => s.id === stopId)?.puzzles[idx];
+    if (puzzle) puzzle.refs = (puzzle.refs || []).filter((r) => r.id !== ref.id);
+    demoContentSave(content);
+    return { ok: true };
+  }
+  const sb = await supabase();
+  await sb.storage.from('puzzle-refs').remove([ref.path]);
+  const { error } = await sb.from('photo_refs').delete().eq('id', ref.id);
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+export async function adminRemoveFiles(paths) {
+  if (hasBackend && paths.length) await (await supabase()).storage.from('puzzle-refs').remove(paths);
+}
+/** Short-lived URLs for private files (demo mode stores data: URLs directly). */
+export async function signedUrls(bucket, paths) {
+  const list = paths.filter(Boolean);
+  if (!hasBackend || !list.length) return Object.fromEntries(list.map((p) => [p, p]));
+  const { data } = await (await supabase()).storage.from(bucket).createSignedUrls(list, 3600);
+  return Object.fromEntries((data || []).map((d) => [d.path, d.signedUrl]));
+}
+
+// ---------- admin: photo review ----------
+const placeholder = (label, color) => `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='320' height='240'><rect width='320' height='240' fill='${color}'/><text x='160' y='128' font-size='22' text-anchor='middle' fill='white' font-family='sans-serif'>${label}</text></svg>`)}`;
+export async function adminPhotoSubmissions(status = null) {
+  if (!hasBackend) {
+    const stored = readJson(KEYS.subs, null) || [
+      { id: 's1', at: new Date(Date.now() - 4 * 60000).toISOString(), verdict: 'review', confidence: 0.62, reason: 'Looks like the same alarm but the angle hides the label.', model: 'gemma4:31b (demo)', status: 'pending', path: placeholder('player photo', '#4285F4'), teamName: 'Byte Me', userName: 'Zayd', stopId: 'lobby', stopPlace: 'Main Lobby', idx: 1, puzzleTitle: 'Emergency eyes', refPaths: [placeholder('reference 1', '#34A853'), placeholder('reference 2', '#FBBC05')] },
+      { id: 's2', at: new Date(Date.now() - 20 * 60000).toISOString(), verdict: 'match', confidence: 0.93, reason: 'Same red fire alarm next to the stairs.', model: 'gemma4:31b (demo)', status: 'approved', path: placeholder('player photo', '#EA4335'), teamName: 'Night Owls', userName: 'Amira', stopId: 'lobby', stopPlace: 'Main Lobby', idx: 1, puzzleTitle: 'Emergency eyes', refPaths: [placeholder('reference 1', '#34A853')] },
+    ];
+    writeJson(KEYS.subs, stored);
+    return stored.filter((x) => !status || x.status === status);
+  }
+  const { data, error } = await (await supabase()).rpc('admin_photo_submissions', { p_status: status, p_limit: 80 });
+  if (error) throw error;
+  return data;
+}
+export async function adminReviewPhoto(id, approve) {
+  if (hasBackend) return adminRpc('admin_review_photo', { p_id: id, p_approve: approve });
+  const subs = readJson(KEYS.subs, []);
+  const sub = subs.find((x) => x.id === id);
+  if (sub) sub.status = approve ? 'approved' : 'rejected';
+  writeJson(KEYS.subs, subs);
+  return { ok: true };
 }
