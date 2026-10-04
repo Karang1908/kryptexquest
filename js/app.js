@@ -8,26 +8,66 @@ import { compressImage } from './image.js';
 import { startLoginArt } from './login-art.js';
 
 const $ = (selector) => document.querySelector(selector);
-const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// S.view is the server's (or demo engine's) one source of truth; S.stops / S.progress are conveniences derived from it.
 const S = {
   started: false, viewTeam: false, polling: false,
-  user: null, stops: [], progress: { unlocked: [], solved: [], clues: {} },
+  user: null, view: null, stops: [], progress: { team: null, solved: [], solvedBy: {}, pending: [], clues: {} },
   avatar: 'male', fix: null, gps: 'idle', world: null, loc: null,
-  openId: null, expanded: 0, photo: null, busy: false,
+  openId: null, expanded: 0, photo: null, busy: false, presence: {}, mapSig: '',
+  seenAnnounce: Number(localStorage.getItem('kq-seen-announce') || 0), shownAnnounce: 0, safetyMsg: '', boardTimer: null,
 };
 let toastTimer;
+const PRESENCE_MS = 15 * 60_000;
 
 // ---------- derived state ----------
+const isHub = (stop) => stop.role === 'hub';
 const stopById = (id) => S.stops.find((s) => s.id === id);
-const solvedCount = (stop) => stop.puzzles.filter((p) => S.progress.solved.includes(`${stop.id}:${p.idx}`)).length;
-const isComplete = (stop) => solvedCount(stop) === stop.puzzles.length;
-const isUnlocked = (stop) => stop.ord === 1 || S.progress.unlocked.includes(stop.id);
-const statusOf = (stop) => (isComplete(stop) ? 'cleared' : isUnlocked(stop) ? 'open' : 'locked');
+const solvedCount = (stop) => stop.puzzles.filter((p) => p.solved).length;
+const isComplete = (stop) => stop.state === 'cleared';
+const isUnlocked = (stop) => stop.state !== 'locked';
 const radiusOf = (stop) => stop.radius || CONFIG.defaultRadiusM;
 const distanceTo = (stop) => (S.fix ? distanceM(S.fix, stop) : null);
-const inRange = (stop) => distanceTo(stop) !== null && distanceTo(stop) <= radiusOf(stop);
+const inRange = (stop) => {
+  if (Date.now() - (S.presence[stop.id] || 0) < PRESENCE_MS) return true;      // scanned the QR posted at the stop
+  const d = distanceTo(stop);
+  return d !== null && d <= radiusOf(stop) + Math.min(Math.max(S.fix?.accuracy || 0, 0), 25);
+};
 const fmtDist = (m) => (m === null ? '—' : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`);
+const teamOf = () => S.view?.team ?? null;
+function memberName(id) { return teamOf()?.members.find((m) => m.id === id)?.name; }
+const playStops = () => S.stops.filter((s) => s.role === 'stop');
+/** The place name is a reward for discovering it; until then players only know "Location N" and a hint. */
+const stopTitle = (stop) => (stop.role === 'stop' && stop.state === 'locked' && !inRange(stop) ? `Location ${stop.ord}` : stop.place);
+
+function applyView(view) {
+  S.view = view;
+  S.stops = view.stops || [];
+  const solved = []; const solvedBy = {}; const pending = []; const clues = {};
+  S.stops.forEach((s) => {
+    if (s.state === 'cleared') clues[s.id] = { clue: s.nextClue, exitFlag: s.exitFlag };
+    s.puzzles.forEach((p) => {
+      const id = `${s.id}:${p.idx}`;
+      if (p.solved) { solved.push(id); solvedBy[id] = p.solvedBy; }
+      if (p.pending) pending.push(id);
+    });
+  });
+  S.progress = { team: view.team, solved, solvedBy, pending, clues };
+  syncWorldStops();
+  renderAnnouncements();
+  if (view.team?.finishedAt && localStorage.getItem('kq-finish-seen') !== view.team.id) showFinish();
+}
+
+/** Stops with a beacon on the map: the base, anything unlocked, and any hinted stop you are standing at. */
+function syncWorldStops() {
+  if (!S.world) return;
+  const visible = S.stops.filter((s) => isHub(s) || s.state !== 'locked' || inRange(s));
+  const sig = visible.map((s) => `${s.id}|${s.lat}|${s.lng}|${s.radius}|${s.icon}|${stopTitle(s)}`).join(';');
+  if (sig === S.mapSig) return;
+  S.mapSig = sig;
+  S.world.setStops(visible.map((s) => ({ ...s, place: stopTitle(s) })));
+}
 
 function toast(message) {
   const el = $('#toast');
@@ -43,10 +83,13 @@ function confetti() {
 
 // ---------- HUD ----------
 function renderHud() {
-  const done = S.stops.filter(isComplete).length;
-  $('#hudProgress').textContent = `${done} / ${S.stops.length}`;
-  $('#hudDots').innerHTML = S.stops.map((s) => `<b class="${statusOf(s)}"></b>`).join('');
-  S.world?.refreshStops(Object.fromEntries(S.stops.map((s) => [s.id, statusOf(s)])), S.openId);
+  const list = playStops();
+  const needed = S.view?.hub?.needed ?? list.length;
+  const done = list.filter(isComplete).length;
+  $('#hudProgress').textContent = `${done} / ${needed}`;
+  const dots = Array.from({ length: needed }, (_, i) => list[i]?.state ?? 'locked');
+  $('#hudDots').innerHTML = dots.map((state) => `<b class="${state}"></b>`).join('');
+  S.world?.refreshStops(Object.fromEntries(S.stops.map((s) => [s.id, isHub(s) ? 'hub' : s.state])), S.openId);
 }
 
 function renderGps() {
@@ -57,11 +100,68 @@ function renderGps() {
   $('#gpsText').textContent = label;
 }
 
+// ---------- status, announcements, safety ----------
+const clockText = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+function renderStatus() {
+  const el = $('#statusBanner');
+  const g = S.view?.game;
+  const skew = g?.now ? Date.parse(g.now) - Date.now() : 0;
+  let html = '';
+  if (g?.status === 'lobby') html = g.startsAt ? `⏳ The quest starts in <b>${clockText(Date.parse(g.startsAt) - (Date.now() + skew))}</b>` : '⏳ The quest has not started yet. Wait for the organisers.';
+  else if (g?.status === 'paused') html = '⏸ The quest is paused by the organisers.';
+  else if (g?.status === 'ended') html = '🏁 The quest has ended. <button type="button" data-action="open-board">See the results</button>';
+  else if (g?.endsAt) { const left = Date.parse(g.endsAt) - (Date.now() + skew); if (left < 15 * 60_000) html = `⏱ <b>${clockText(left)}</b> left`; }
+  el.hidden = !html;
+  if (html && el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+}
+
+function renderAnnouncements() {
+  const latest = S.view?.announcements?.[0];
+  const banner = $('#announceBanner');
+  if (!latest || latest.id <= S.seenAnnounce) { banner.hidden = true; return; }
+  banner.hidden = false;
+  banner.classList.toggle('warn', latest.level === 'warn');
+  $('#announceText').textContent = `📣 ${latest.message}`;
+  if (S.shownAnnounce !== latest.id) { S.shownAnnounce = latest.id; navigator.vibrate?.([120, 80, 120]); toast('New message from the organisers'); }
+}
+
+function safetyCheck() {
+  const g = S.view?.game;
+  let message = '';
+  if (S.fix && g) {
+    if (g.bounds && distanceM(S.fix, g.bounds) > g.bounds.radius) message = '⚠ You are leaving the quest area. Please head back toward the campus.';
+    for (const zone of g.noGo || []) if (distanceM(S.fix, zone) < zone.radius + 5) message = `⛔ Keep out: ${zone.label || 'restricted area'}. Please move away.`;
+  }
+  if (message === S.safetyMsg) return;
+  S.safetyMsg = message;
+  const el = $('#safetyBanner');
+  el.hidden = !message; el.textContent = message;
+  if (message) navigator.vibrate?.([200, 100, 200]);
+}
+
+// ---------- nearest target ----------
+function prevCleared(stop) {
+  const prev = playStops().filter((s) => s.ord < stop.ord).at(-1);
+  return !prev || isComplete(prev);
+}
 function nearestTarget() {
-  if (!S.fix) return null;
-  const pool = S.stops.filter((s) => statusOf(s) !== 'cleared' && (isUnlocked(s) || S.stops[s.ord - 2] && isComplete(S.stops[s.ord - 2])));
-  const list = pool.length ? pool : S.stops;
-  return list.map((s) => ({ stop: s, dist: distanceTo(s) })).sort((a, b) => a.dist - b.dist)[0];
+  if (!S.fix || !S.view?.team?.locked) return null;
+  const hub = S.stops.find(isHub);
+  const stops = S.stops.filter((s) => !isHub(s));
+  let pool;
+  if (!S.view.started && hub) pool = [hub];
+  else {
+    const open = stops.filter((s) => s.state === 'open');
+    // A hinted stop only counts once you are standing at it: finding it from the hint is the game.
+    const here = stops.filter((s) => s.state === 'locked' && inRange(s));
+    const allCleared = playStops().length > 0 && playStops().every(isComplete);
+    const handedAll = (S.view.hub?.entered?.length ?? 0) >= (S.view.hub?.needed ?? 0);
+    pool = [...open, ...here];
+    if (!pool.length && hub) pool = [hub];
+    if (allCleared && !handedAll && hub) pool = [hub];
+  }
+  if (!pool.length) return null;
+  return pool.map((s) => ({ stop: s, dist: distanceTo(s) })).sort((a, b) => a.dist - b.dist)[0];
 }
 
 function renderNear() {
@@ -69,36 +169,118 @@ function renderNear() {
   const target = nearestTarget();
   if (!target || S.openId) { card.hidden = true; return; }
   const { stop, dist } = target;
+  const here = inRange(stop);
   card.hidden = false;
   card.dataset.stop = stop.id;
-  card.classList.toggle('in-range', dist <= radiusOf(stop));
-  $('#nearKicker').textContent = dist <= radiusOf(stop) ? 'YOU ARE HERE · TAP TO OPEN' : isUnlocked(stop) ? 'NEXT SIGNAL' : 'NEXT STOP';
-  $('#nearName').textContent = stop.place;
+  card.classList.toggle('in-range', here);
+  $('#nearKicker').textContent = here ? 'YOU ARE HERE · TAP TO OPEN' : isHub(stop) ? (S.view.started ? 'THE BASE' : 'CHECK IN AT THE BASE') : isUnlocked(stop) ? 'NEXT SIGNAL' : 'NEXT STOP';
+  $('#nearName').textContent = stopTitle(stop);
   $('#nearDist').textContent = fmtDist(dist);
-  const here = S.world?.shownPosition() || S.fix;
+  const from = S.world?.shownPosition() || S.fix;
   // The ➤ glyph points east (90°) at rotate(0).
-  $('#nearArrow').style.transform = `rotate(${bearingDeg(here, stop) - (S.world?.bearing() || 0) - 90}deg)`;
+  $('#nearArrow').style.transform = `rotate(${bearingDeg(from, stop) - (S.world?.bearing() || 0) - 90}deg)`;
 }
 
-// ---------- stop sheet ----------
-function puzzleCard(stop, puzzle, range) {
-  const id = `${stop.id}:${puzzle.idx}`;
-  const solved = S.progress.solved.includes(id);
-  const open = S.expanded === puzzle.idx && !solved;
-  const isPhoto = puzzle.kind === 'photo';
+// ---------- sheets ----------
+function rangeBanner(stop) {
+  const range = inRange(stop);
+  const sim = S.loc?.isSim();
+  return range ? `<div class="range ok">✓ You're at ${esc(stopTitle(stop))}</div>`
+    : `<div class="range far">⌖ ${fmtDist(distanceTo(stop))} away · get within ${radiusOf(stop)} m to interact. Bad GPS indoors? Scan the QR code posted at the spot.${sim ? ` <button type="button" class="link" data-action="teleport">Teleport (sim)</button>` : ''}</div>`;
+}
+
+function puzzleCard(stop, p, range) {
+  const id = `${stop.id}:${p.idx}`;
+  const solved = p.solved;
+  const open = S.expanded === p.idx && !solved;
+  const photoStage = p.kind === 'photo' && !p.photoCleared && !solved;
   const hasPhoto = S.photo?.id === id;
-  const pending = !solved && (S.progress.pending || []).includes(id);
   const lock = range ? '' : 'disabled';
+  const busy = S.busy ? 'disabled' : '';
+  const tag = solved ? esc(memberName(p.solvedBy) || 'CLEARED') : p.pending ? 'IN REVIEW' : photoStage ? 'PHOTO' : 'ANSWER';
+  let body = '';
+  if (open && photoStage) {
+    body = `<p class="clue-line">🔎 <b>Clue:</b> ${esc(p.prompt)}</p>
+      <p class="loc-note">Find it, photograph it, and the real question appears.</p>
+      ${p.pending ? '<div class="range far">⏳ An organiser is checking your photo. You can send another one if you like.</div>' : ''}
+      <label class="photo-pick ${lock}">📷 ${hasPhoto ? 'Retake photo' : 'Take a photo'}<input id="photoInput" type="file" accept="image/*" capture="environment" ${lock} /></label>
+      ${hasPhoto ? `<img class="photo-preview" src="${S.photo.url}" alt="Your photo" /><button class="primary-button" type="button" data-action="verify-photo" ${lock || busy}>${S.busy ? 'Checking…' : 'Send photo'}</button>` : ''}`;
+  } else if (open) {
+    body = `${p.kind === 'photo' ? '<span class="tick-tag">✓ Photo verified</span>' : ''}<p>${esc(p.kind === 'photo' ? p.question : p.prompt)}</p>
+      <form class="flag-row" data-form="flag" data-idx="${p.idx}"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{...}" aria-label="Flag" ${lock} /><button class="small-action" type="submit" ${lock || busy}>Verify</button></form>`;
+  }
   return `<article class="puzzle ${solved ? 'solved' : ''}">
-    <button class="puzzle-head" type="button" data-action="expand" data-idx="${puzzle.idx}" aria-expanded="${open}">
-      <span class="puzzle-num">${solved ? '✓' : puzzle.idx + 1}</span><strong>${esc(puzzle.title)}</strong>
-      <small>${solved ? esc(memberName(S.progress.solvedBy?.[id]) || 'CLEARED') : pending ? 'IN REVIEW' : isPhoto ? 'PHOTO' : 'FLAG'}</small></button>
-    ${open ? `<div class="puzzle-body"><p>${esc(puzzle.prompt)}</p>
-      ${isPhoto && pending ? '<div class="range far">⏳ An organiser is checking your photo. You can send another one if you like.</div>' : ''}
-      ${isPhoto ? `<label class="photo-pick ${lock}">📷 ${hasPhoto ? 'Retake photo' : 'Take a photo'}<input id="photoInput" type="file" accept="image/*" capture="environment" ${lock} /></label>
-        ${hasPhoto ? `<img class="photo-preview" src="${S.photo.url}" alt="Your photo" /><button class="primary-button" type="button" data-action="verify-photo" ${lock || (S.busy ? 'disabled' : '')}>${S.busy ? 'Reviewing…' : 'Send for review'}</button>` : ''}`
-      : `<form class="flag-row" data-form="flag" data-idx="${puzzle.idx}"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{...}" aria-label="Flag" ${lock} /><button class="small-action" type="submit" ${lock || (S.busy ? 'disabled' : '')}>Verify</button></form>`}
-    </div>` : ''}</article>`;
+    <button class="puzzle-head" type="button" data-action="expand" data-idx="${p.idx}" aria-expanded="${open}">
+      <span class="puzzle-num">${solved ? '✓' : p.idx + 1}</span><strong>${esc(p.title)}</strong><small>${tag}</small></button>
+    ${open ? `<div class="puzzle-body">${body}</div>` : ''}</article>`;
+}
+
+function locationCard(stop, index, range) {
+  const title = stop.state === 'locked' ? `Location ${index + 1}` : stop.place;
+  const chip = stop.state === 'cleared' ? 'CLEARED' : stop.state === 'open' ? 'UNLOCKED' : 'LOCKED';
+  let detail;
+  if (stop.state === 'cleared') detail = `<p class="loc-note">✓ Handoff flag: <code>${esc(stop.exitFlag)}</code></p>`;
+  else if (stop.state === 'open') detail = '<p class="loc-note">Unlocked. Go there and solve its questions.</p>';
+  else if (stop.entryMode === 'hub') {
+    detail = `<p class="loc-hint">❓ ${esc(stop.entryQuestion)}</p>
+      <form class="flag-row" data-form="hub-answer" data-stop="${esc(stop.id)}"><input class="flag-input" name="answer" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Answer" aria-label="Answer for location ${index + 1}" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Unlock</button></form>`;
+  } else detail = `<p class="loc-note">🔒 Opens with the handoff flag from ${esc(stop.prevPlace ? (S.stops.find((x) => x.place === stop.prevPlace && x.state !== 'locked') ? stop.prevPlace : 'the previous location') : 'the previous location')}. Type it when you get there.</p>`;
+  return `<article class="stop-card ${stop.state}"><div class="loc-head"><span class="loc-num">${stop.state === 'cleared' ? '✓' : index + 1}</span><strong>${esc(title)}</strong><span class="chip-s">${chip}</span></div>
+    ${stop.hint ? `<p class="loc-hint">💡 ${esc(stop.hint)}</p>` : ''}${detail}</article>`;
+}
+
+function renderHubSheet(hub) {
+  const v = S.view;
+  const range = inRange(hub);
+  S.rangeShown = range;
+  const list = playStops();
+  const needed = v.hub?.needed ?? list.length;
+  const entered = v.hub?.entered ?? [];
+  const bonus = S.stops.find((s) => s.role === 'bonus');
+  let body = '';
+  if (v.team.finishedAt) body += `<div class="finished-box">🏁 Quest complete! Time: ${clockText((Date.parse(v.team.finishedAt) - Date.parse(v.team.startedAt || v.team.finishedAt)))}</div>`;
+  if (!v.started) {
+    body += `<div class="gate"><h3>Check in at the base</h3><p>Every team starts here. Check in once your whole team is at the vending machine area: your clock starts and the locations appear.</p>
+      <button class="primary-button" type="button" data-action="checkin" ${range && !S.busy ? '' : 'disabled'}>Check in</button></div>`;
+  } else {
+    body += `<div class="section-title">LOCATIONS · ${list.filter(isComplete).length} / ${needed} CLEARED</div>`;
+    body += list.map((s, i) => locationCard(s, i, range)).join('');
+    for (let i = list.length; i < needed; i += 1) body += `<article class="stop-card"><div class="loc-head"><span class="loc-num">${i + 1}</span><strong>Location ${i + 1}</strong><span class="chip-s">LOCKED</span></div><p class="loc-note">Its hint appears once you clear the location before it.</p></article>`;
+    const allIn = entered.length >= needed && needed > 0;
+    body += `<div class="handin"><h3>Hand in your flags</h3>
+      <p class="loc-note">Bring each location's handoff flag back here. ${entered.length} / ${needed} handed in${allIn ? ': the bonus location is open!' : '. Hand in all of them to reveal the bonus location.'}</p>
+      ${entered.length ? `<div class="handed">${entered.map((id) => `<span>✓ ${esc(S.stops.find((s) => s.id === id)?.place || id)}</span>`).join('')}</div>` : ''}
+      ${allIn ? '' : `<form class="flag-row" data-form="hub-flag"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{...}" aria-label="Location flag" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Hand in</button></form>`}</div>`;
+    if (bonus) body += `<article class="stop-card ${bonus.state}"><div class="loc-head"><span class="loc-num">★</span><strong>Bonus: ${esc(bonus.place)}</strong><span class="chip-s">${bonus.state === 'cleared' ? 'CLEARED' : 'OPEN'}</span></div>${bonus.hint ? `<p class="loc-hint">💡 ${esc(bonus.hint)}</p>` : ''}<p class="loc-note">${bonus.state === 'cleared' ? 'Cleared!' : 'Go there and solve its question to finish the quest.'}</p></article>`;
+    else body += '<article class="stop-card"><div class="loc-head"><span class="loc-num">★</span><strong>Bonus location</strong><span class="chip-s">SECRET</span></div><p class="loc-note">Hand in every location flag to reveal it.</p></article>';
+  }
+  $('#sheetBody').innerHTML = `<div class="sheet-top"><span class="tag">${esc(hub.label || 'BASE')}</span><button class="close" type="button" data-action="close-sheet" aria-label="Close">×</button></div>
+    <h2>${esc(hub.name)}</h2><p class="place">${esc(hub.icon)} ${esc(hub.place)}</p><p class="desc">${esc(hub.description)}</p>${rangeBanner(hub)}${body}`;
+}
+
+function renderStopSheet(stop) {
+  const range = inRange(stop);
+  S.rangeShown = range;
+  const unlocked = isUnlocked(stop);
+  const complete = isComplete(stop);
+  const clue = S.progress.clues[stop.id];
+  let body;
+  if (!unlocked && stop.entryMode === 'hub') {
+    body = `<div class="gate"><h3>Unlocked at the base</h3><p>This location opens when you answer its question at the vending machine area.</p><button class="primary-button" type="button" data-action="open-hub">Open the base</button></div>`;
+  } else if (!unlocked) {
+    body = `<div class="gate"><h3>Location locked</h3><p>The password is the handoff flag from ${esc(stop.prevPlace || 'the previous location')}.</p>
+      <form class="flag-row" data-form="unlock"><input class="flag-input" name="gate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{PREVIOUS_FLAG}" aria-label="Location password" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Unlock</button></form></div>`;
+  } else {
+    const total = stop.puzzles.length || 1;
+    body = `<div class="progress"><span>SIGNALS TO DECODE</span><b>${solvedCount(stop)} / ${stop.puzzles.length}</b></div>
+      <div class="bar"><i style="width:${(solvedCount(stop) / total) * 100}%"></i></div>
+      <div class="puzzles">${stop.puzzles.map((p) => puzzleCard(stop, p, range)).join('')}</div>
+      ${complete && clue ? `<div class="clue">${clue.clue ? `<small>NEXT CLUE</small><strong>“${esc(clue.clue)}”</strong>` : ''}<small>HANDOFF FLAG</small><code>${esc(clue.exitFlag)}</code>
+        <p class="loc-note">${stop.role === 'bonus' ? 'Quest complete: head to the base!' : 'Keep this flag: it opens the next location, and you hand it in at the base.'}</p></div>` : ''}`;
+  }
+  const hintLine = !unlocked && stop.hint ? `<p class="desc"><b>💡 Hint:</b> ${esc(stop.hint)}</p>` : `<p class="desc">${esc(stop.description)}</p>`;
+  $('#sheetBody').innerHTML = `<div class="sheet-top"><span class="tag">${esc(stop.label)}</span><button class="close" type="button" data-action="close-sheet" aria-label="Close">×</button></div>
+    <h2>${esc(unlocked ? stop.name : stopTitle(stop))}</h2><p class="place">${esc(stop.icon)} ${esc(stopTitle(stop))}</p>${hintLine}${rangeBanner(stop)}${body}`;
 }
 
 function renderSheet() {
@@ -108,40 +290,14 @@ function renderSheet() {
   sheet.setAttribute('aria-hidden', String(!stop));
   document.body.classList.toggle('sheet-open', Boolean(stop));
   if (!stop) return;
-
-  const dist = distanceTo(stop);
-  const range = inRange(stop);
-  S.rangeShown = range;
-  const unlocked = isUnlocked(stop);
-  const complete = isComplete(stop);
-  const next = S.stops[stop.ord];
-  const clue = S.progress.clues[stop.id];
-  const sim = S.loc?.isSim();
-
-  const rangeBanner = range ? `<div class="range ok">✓ You're at ${esc(stop.place)}</div>`
-    : `<div class="range far">⌖ ${fmtDist(dist)} away · walk within ${radiusOf(stop)} m to interact${sim ? ` <button type="button" class="link" data-action="teleport">Teleport (sim)</button>` : ''}</div>`;
-
-  let body;
-  if (!unlocked) {
-    body = `<div class="gate"><h3>Location locked</h3><p>The password is the handoff flag from the previous stop.</p>
-      <form class="flag-row" data-form="unlock"><input class="flag-input" name="gate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{PREVIOUS_FLAG}" aria-label="Location password" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Unlock</button></form></div>`;
-  } else {
-    body = `<div class="progress"><span>SIGNALS TO DECODE</span><b>${solvedCount(stop)} / ${stop.puzzles.length}</b></div>
-      <div class="bar"><i style="width:${(solvedCount(stop) / stop.puzzles.length) * 100}%"></i></div>
-      <div class="puzzles">${stop.puzzles.map((p) => puzzleCard(stop, p, range)).join('')}</div>
-      ${complete && clue ? `<div class="clue"><small>NEXT CLUE</small><strong>“${esc(clue.clue)}”</strong><small>HANDOFF FLAG</small><code>${esc(clue.exitFlag)}</code>${next ? '' : '<p class="win">🏁 Kryptex found. You finished the trail!</p>'}</div>` : ''}`;
-  }
-
-  $('#sheetBody').innerHTML = `<div class="sheet-top"><span class="tag">${esc(stop.label)}</span><button class="close" type="button" data-action="close-sheet" aria-label="Close">×</button></div>
-    <h2>${esc(stop.name)}</h2><p class="place">${esc(stop.icon)} ${esc(stop.place)}</p><p class="desc">${esc(stop.description)}</p>
-    ${rangeBanner}${body}`;
+  if (isHub(stop)) renderHubSheet(stop); else renderStopSheet(stop);
 }
 
 function openStop(id) {
   const stop = stopById(id);
   if (!stop) return;
   S.openId = id;
-  const first = stop.puzzles.find((p) => !S.progress.solved.includes(`${id}:${p.idx}`));
+  const first = stop.puzzles.find((p) => !p.solved);
   S.expanded = first ? first.idx : -1;
   clearPhoto();
   renderSheet(); renderHud(); renderNear();
@@ -149,17 +305,18 @@ function openStop(id) {
 function closeSheet() { S.openId = null; clearPhoto(); renderSheet(); renderHud(); renderNear(); }
 function clearPhoto() { if (S.photo?.url) URL.revokeObjectURL(S.photo.url); S.photo = null; }
 
+/** Common tail for every action: show errors, adopt the fresh view, celebrate clears. */
 function applyResult(stop, result, successMessage) {
   S.busy = false;
   if (!result.ok) { renderSheet(); toast(result.error || 'Something went wrong. Try again.'); return false; }
-  if (result.pending) { S.progress = result.progress; clearPhoto(); renderSheet(); toast(result.message || 'Sent for review.'); return true; }
-  const wasComplete = isComplete(stop);
-  S.progress = result.progress;
-  const next = stop.puzzles.find((p) => !S.progress.solved.includes(`${stop.id}:${p.idx}`));
-  S.expanded = next ? next.idx : -1;
+  const wasComplete = Boolean(stop && stop.state === 'cleared');
+  applyView(result.view);
+  const now = stop && stopById(stop.id);
+  if (now) { const next = now.puzzles.find((p) => !p.solved); S.expanded = next ? next.idx : -1; }
   clearPhoto();
   renderSheet(); renderHud(); renderNear();
-  if (!wasComplete && isComplete(stop)) { confetti(); toast('Location cleared! Your next clue is ready.'); }
+  if (result.pending) { toast(result.message || 'Sent for review.'); return true; }
+  if (now && !wasComplete && now.state === 'cleared') { confetti(); toast(now.role === 'bonus' ? 'Bonus cleared!' : 'Location cleared! Your handoff flag is ready.'); }
   else toast(successMessage);
   return true;
 }
@@ -173,10 +330,16 @@ document.addEventListener('click', async (event) => {
   if (action === 'close-sheet') closeSheet();
   if (action === 'expand') { S.expanded = Number(el.dataset.idx); clearPhoto(); renderSheet(); }
   if (action === 'teleport' && stop) { S.loc.teleport(stop); toast(`Teleported to ${stop.place}.`); }
+  if (action === 'open-hub') { const hub = S.stops.find(isHub); if (hub) openStop(hub.id); }
+  if (action === 'open-board') openBoard();
+  if (action === 'checkin' && stop && !S.busy) {
+    S.busy = true; renderSheet();
+    applyResult(stop, await api.checkIn(S.fix), 'Checked in! The locations are now visible.');
+  }
   if (action === 'verify-photo' && stop && S.photo && !S.busy) {
     S.busy = true; renderSheet();
     const result = await api.verifyPhoto(stop, S.expanded, S.photo.blob, S.fix);
-    applyResult(stop, result, result.simulated ? 'Demo review passed (simulated, not real AI).' : 'Photo verified. One signal closer.');
+    applyResult(stop, result, result.simulated ? 'Demo: photo accepted (simulated, not real AI). Your question is ready.' : 'Photo verified! Your question is ready.');
   }
 });
 
@@ -186,13 +349,18 @@ document.addEventListener('submit', async (event) => {
   event.preventDefault();
   const stop = stopById(S.openId);
   if (!stop || S.busy) return;
-  const value = new FormData(form).get(form.dataset.form === 'unlock' ? 'gate' : 'flag');
+  const kind = form.dataset.form;
+  const data = new FormData(form);
+  const value = data.get({ flag: 'flag', unlock: 'gate', 'hub-answer': 'answer', 'hub-flag': 'flag' }[kind]);
   if (!String(value || '').trim()) return;
   S.busy = true; renderSheet();
-  const result = form.dataset.form === 'unlock'
-    ? await api.unlock(stop, value, S.fix)
-    : await api.submitFlag(stop, Number(form.dataset.idx), value, S.fix);
-  applyResult(stop, result, form.dataset.form === 'unlock' ? `${stop.place} unlocked. Three puzzles await.` : 'Flag verified. One signal closer.');
+  if (kind === 'unlock') applyResult(stop, await api.unlock(stop, value, S.fix), `${stop.place} unlocked.`);
+  else if (kind === 'hub-answer') { const target = stopById(form.dataset.stop); applyResult(stop, await api.hubAnswer(target, value, S.fix), 'Correct! That location is unlocked. Go find it.'); }
+  else if (kind === 'hub-flag') {
+    const result = await api.hubFlag(value, S.fix);
+    applyResult(stop, result, result.ok ? `✓ ${result.place} handed in (${result.have}/${result.need}).` : '');
+    if (result.ok && result.have >= result.need) { confetti(); toast('Every flag is in! The bonus location is revealed.'); }
+  } else applyResult(stop, await api.submitFlag(stop, Number(form.dataset.idx), value, S.fix), 'Flag verified. One signal closer.');
 });
 
 document.addEventListener('change', async (event) => {
@@ -206,6 +374,46 @@ document.addEventListener('change', async (event) => {
 });
 
 $('#nearCard').addEventListener('click', () => openStop($('#nearCard').dataset.stop));
+$('#announceDismiss').addEventListener('click', () => {
+  const latest = S.view?.announcements?.[0];
+  if (latest) { S.seenAnnounce = latest.id; localStorage.setItem('kq-seen-announce', String(latest.id)); }
+  $('#announceBanner').hidden = true;
+});
+
+// ---------- leaderboard, help, finish ----------
+async function renderBoard() {
+  try {
+    const board = await api.leaderboard();
+    const fmt = (r) => (r.finishedAt ? `🏁 ${clockText((r.elapsedSeconds || 0) * 1000)}` : `${r.flags} flags`);
+    $('#boardTitle').textContent = board.status === 'ended' ? 'Final results' : 'Standings';
+    $('#boardBody').innerHTML = board.rows.length ? board.rows.map((r) => `<div class="board-row ${r.teamId === board.me ? 'me' : ''}"><span class="pos">${r.rank}</span><span><strong>${esc(r.name)}</strong><small>${r.stopsCleared} locations · ${r.hubFlags} flags handed in · ${r.players} players</small></span><span class="time">${fmt(r)}</span></div>`).join('') : '<div class="empty">No teams yet.</div>';
+  } catch (error) { $('#boardBody').textContent = 'Could not load the standings.'; console.warn(error); }
+}
+function openBoard() {
+  $('#boardDialog').showModal();
+  renderBoard();
+  clearInterval(S.boardTimer);
+  S.boardTimer = setInterval(renderBoard, 6000);
+}
+$('#boardDialog').addEventListener('close', () => clearInterval(S.boardTimer));
+
+async function showFinish() {
+  const team = S.view.team;
+  localStorage.setItem('kq-finish-seen', team.id);
+  confetti();
+  let rank = '';
+  try { const board = await api.leaderboard(); const row = board.rows.find((r) => r.teamId === team.id); if (row) rank = ` You finished <b>#${row.rank}</b> of ${board.rows.length}.`; } catch { /* the board is optional here */ }
+  const took = team.startedAt ? clockText(Date.parse(team.finishedAt) - Date.parse(team.startedAt)) : '';
+  $('#finishText').innerHTML = `${esc(team.name)} cleared every location and the bonus${took ? ` in <b>${took}</b>` : ''}.${rank}`;
+  $('#finishDialog').showModal();
+}
+$('#finishDialog').addEventListener('close', openBoard);
+
+$('#sosSend').addEventListener('click', async () => {
+  const result = await api.requestHelp(S.fix, $('#sosMessage').value);
+  $('#sosDialog').close();
+  toast(result.ok ? 'Organisers have your location and are on their way.' : result.error);
+});
 
 // ---------- location ----------
 let gpsPaintedAt = 0;
@@ -284,9 +492,6 @@ function wireSimulator() {
 }
 
 // ---------- teams ----------
-const teamOf = () => S.progress.team;
-function memberName(id) { return teamOf()?.members.find((m) => m.id === id)?.name; }
-
 function renderTeam() {
   const team = teamOf();
   $('#teamStart').hidden = Boolean(team);
@@ -314,7 +519,7 @@ function renderTeam() {
 async function teamAction(promise, successMessage) {
   const result = await promise;
   if (!result.ok) { toast(result.error || 'Something went wrong.'); return; }
-  S.progress = result.progress;
+  applyView(result.view);
   if (successMessage) toast(successMessage);
   route();
 }
@@ -341,26 +546,53 @@ async function route() {
 
 function typingInSheet() { return document.activeElement?.closest?.('#sheet') && /INPUT|TEXTAREA/.test(document.activeElement.tagName); }
 
+const stable = (view) => JSON.stringify(view && { ...view, game: { ...view.game, now: 0 } }); // the server clock changes every call
+const solvedIds = (view) => (view.stops || []).flatMap((s) => s.puzzles.filter((p) => p.solved).map((p) => ({ id: `${s.id}:${p.idx}`, by: p.solvedBy, title: p.title })));
 function announceTeamSolves(prev, next) {
-  const fresh = next.solved.filter((id) => !prev.solved.includes(id) && next.solvedBy?.[id] !== next.team?.me);
-  if (!fresh.length) return;
-  const [stopId, idx] = fresh[0].split(':');
-  const title = stopById(stopId)?.puzzles.find((p) => p.idx === Number(idx))?.title || 'a flag';
-  toast(`${memberName(next.solvedBy?.[fresh[0]]) || 'A teammate'} solved “${title}”.`);
+  const before = new Set(solvedIds(prev).map((x) => x.id));
+  const fresh = solvedIds(next).filter((x) => !before.has(x.id) && x.by !== next.team?.me);
+  if (fresh.length) toast(`${memberName(fresh[0].by) || 'A teammate'} solved “${fresh[0].title}”.`);
 }
 
+// Polling backs off while nothing changes (4 s -> 10 s), so hundreds of idle phones put little load on the database.
+let pollDelay = 4000;
+function schedulePoll() { setTimeout(async () => { await pollProgress(); schedulePoll(); }, pollDelay); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { pollDelay = 4000; pollProgress(); } });
+
 async function pollProgress() {
-  if (S.polling) return;
+  if (S.polling || document.hidden) return;
   S.polling = true;
   try {
-    const next = await api.loadProgress();
-    if (JSON.stringify(next) === JSON.stringify(S.progress)) return;
-    const prev = S.progress;
-    S.progress = next;
-    if (S.started) { announceTeamSolves(prev, next); renderHud(); renderNear(); if (!typingInSheet()) renderSheet(); }
+    const next = await api.loadView();
+    if (stable(next) === stable(S.view)) { pollDelay = Math.min(10_000, Math.round(pollDelay * 1.25)); return; }
+    pollDelay = 4000;
+    const prev = S.view || { stops: [], team: null };
+    applyView(next);
+    if (S.started) { announceTeamSolves(prev, next); renderHud(); renderNear(); renderStatus(); if (!typingInSheet()) renderSheet(); }
     if (!S.started || !$('#teamScreen').hidden || prev.team?.locked !== next.team?.locked) route();
   } catch (error) { console.warn('progress poll failed', error); }
   finally { S.polling = false; }
+}
+
+// ---------- QR codes ----------
+/** A stop's printed QR opens ?qr=<stop>.<token>: scanning with the phone camera proves presence indoors. */
+function captureQr() {
+  const q = new URLSearchParams(location.search).get('qr');
+  if (!q) return;
+  sessionStorage.setItem('kq-qr', q);
+  history.replaceState(null, '', location.pathname);
+}
+async function handleQr() {
+  const q = sessionStorage.getItem('kq-qr');
+  if (!q || !S.view?.team?.locked) return;
+  sessionStorage.removeItem('kq-qr');
+  const [stopId, token] = q.split('.');
+  const result = await api.scanQr(stopId, token);
+  if (!result.ok) { toast(result.error); return; }
+  S.presence[stopId] = Date.now();
+  applyView(result.view);
+  toast(`Scanned ${result.place}. You count as being there for 15 minutes.`);
+  if (stopById(stopId)) openStop(stopId);
 }
 
 // ---------- boot ----------
@@ -383,8 +615,7 @@ async function enterGame(user) {
   }
   S.user = user;
   try {
-    const game = await api.loadGame();
-    S.stops = game.stops; S.progress = game.progress;
+    applyView(await api.loadView());
   } catch (error) {
     console.error(error);
     return showLogin('Could not load the quest. Check your connection and try again.');
@@ -398,7 +629,7 @@ async function enterGame(user) {
   $('#simToggleRow').hidden = !CONFIG.allowSimulator;
   $('#locSim').hidden = !CONFIG.allowSimulator;
   $('#modeNote').textContent = api.hasBackend ? '' : 'Demo mode: sample content, progress saved on this device only.';
-  setInterval(pollProgress, 4000);
+  schedulePoll();
   await route();
   if (!localStorage.getItem('kq-avatar')) $('#avatarDialog').showModal();
 }
@@ -421,15 +652,19 @@ async function startGame() {
     return;
   }
   S.world.setAvatar(S.avatar);
-  S.world.setStops(S.stops);
+  S.mapSig = '';
+  syncWorldStops();
   if (S.fix) S.world.setFix(S.fix);
-  renderHud(); renderGps();
+  renderHud(); renderGps(); renderStatus();
   setInterval(() => {
+    syncWorldStops();
     renderNear();
     renderHud();
+    renderStatus();
+    safetyCheck();
     // Re-render the sheet only when range flips, so typing in an input is never wiped.
     const stop = stopById(S.openId);
-    if (stop && S.rangeShown !== inRange(stop)) renderSheet();
+    if (stop && S.rangeShown !== inRange(stop) && !typingInSheet()) renderSheet();
   }, 1000);
   // Organisers see where players are: latest position only, every ~5 s.
   setInterval(() => { if (S.fix) api.sendLocation(S.fix).catch(() => {}); }, 5000);
@@ -437,6 +672,7 @@ async function startGame() {
   (function spin() { needle.style.transform = `rotate(${-(S.world.bearing() || 0)}deg)`; requestAnimationFrame(spin); })();
 
   startLocation();
+  handleQr();
   navigator.wakeLock?.request('screen').catch(() => {});
   document.addEventListener('visibilitychange', () => { if (!document.hidden) navigator.wakeLock?.request('screen').catch(() => {}); });
 }
@@ -459,6 +695,7 @@ function showLogin(error) {
 }
 
 async function boot() {
+  captureQr();
   startLoginArt($('#loginCanvas'));
   $('#domainHint').textContent = `@${CONFIG.allowedEmailDomain}`;
   $('#demoSignIn').hidden = api.hasBackend;
@@ -524,6 +761,8 @@ $('#menuDialog').addEventListener('click', async (event) => {
   const action = item.dataset.menu;
   if (action === 'avatar') $('#avatarDialog').showModal();
   if (action === 'team') showTeamScreen(true);
+  if (action === 'board') openBoard();
+  if (action === 'sos') $('#sosDialog').showModal();
   if (action === 'help') $('#helpDialog').showModal();
   if (action === 'reset' && confirm('Reset all demo progress on this device?')) { api.resetDemo(); location.reload(); }
   if (action === 'signout') { await api.signOut(); location.reload(); }
