@@ -191,3 +191,20 @@ td { padding: 9px 10px; border-top: 1px solid var(--line); vertical-align: top; 
 @media (max-width: 900px) { .event-grid { grid-template-columns: 1fr; } .nogo-row { grid-template-columns: 1fr 1fr; } }
 
 .role-badge { margin-left: 4px; padding: 1px 6px; border-radius: 6px; background: rgba(251, 188, 5, 0.18); color: var(--yellow); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* organiser alerts */
+.alert-bar { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 16px; background: rgba(251, 188, 5, 0.1); border-bottom: 1px solid rgba(251, 188, 5, 0.3); font-size: 13px; }
+.alert-bar .alert { display: flex; gap: 8px; align-items: center; padding: 5px 10px; border-radius: 10px; background: var(--surface-2); }
+.alert-bar .alert.stalled { box-shadow: inset 3px 0 #ea4335; }
+.alert-bar .alert.struggling { box-shadow: inset 3px 0 #fbbc05; }
+.alert-bar button { border: 0; border-radius: 8px; padding: 3px 8px; font: inherit; font-size: 12px; background: var(--blue); color: #fff; cursor: pointer; }
+.team-item .flag-alert { color: #fbbc05; margin-left: 6px; }
+.mini.test { background: rgba(251, 188, 5, 0.18); color: #fbbc05; }
+/* readiness checklist */
+.ready-sum { font-size: 14px; }
+.ready-list { display: grid; gap: 4px; max-height: 360px; overflow: auto; }
+.ready-row { display: grid; grid-template-columns: 22px 1fr; gap: 6px; font-size: 13px; padding: 4px 0; }
+.ready-row.bad { color: #f28b82; }
+.ready-row.warn { color: #fdd663; }
+.ready-row.ok { color: #7fdc99; }
+.ready-row label { display: flex; gap: 6px; align-items: center; }
