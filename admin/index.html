@@ -29,6 +29,8 @@
           <button role="tab" data-tab="map" aria-selected="true">Live map</button>
           <button role="tab" data-tab="teams" aria-selected="false">Teams</button>
           <button role="tab" data-tab="log" aria-selected="false">Activity log</button>
+          <button role="tab" data-tab="content" aria-selected="false">Content</button>
+          <button role="tab" data-tab="photos" aria-selected="false">Photos <span id="photoBadge" class="badge-n" hidden></span></button>
         </nav>
         <div class="a-user"><span id="who"></span><button type="button" id="signOut">Sign out</button></div>
       </header>
@@ -66,6 +68,25 @@
           </div>
           <div class="log-scroll"><table class="log-table"><thead><tr><th>Time</th><th>Team</th><th>Player</th><th>Event</th><th>Where</th><th>Result</th><th>Dist</th><th>Detail</th></tr></thead><tbody id="logBody"></tbody></table>
             <button type="button" id="logMore" class="ghost-button" hidden>Load older events</button></div>
+        </section>
+
+        <section id="view-content" class="a-view" hidden>
+          <div class="content-layout">
+            <div class="content-list">
+              <button type="button" id="addLocation" class="primary-button">+ Add location</button>
+              <div id="locList" class="loc-list"></div>
+              <p class="hint">Order here is the order players walk the trail. Each location's handoff flag unlocks the next one.</p>
+            </div>
+            <div id="locEditor" class="loc-editor"></div>
+          </div>
+        </section>
+
+        <section id="view-photos" class="a-view" hidden>
+          <div class="log-tools">
+            <select id="photoStatus" aria-label="Status"><option value="pending">Needs review</option><option value="">All</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
+            <span id="photoCount"></span>
+          </div>
+          <div id="photoList" class="photo-grid"></div>
         </section>
       </main>
     </div>
