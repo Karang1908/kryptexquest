@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#0a0d16" />
+    <title>Console</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="../styles.css" />
+    <link rel="stylesheet" href="./admin.css" />
+  </head>
+  <body class="admin">
+    <!-- Anyone who is not an admin only ever sees this. -->
+    <div id="notFound" class="not-found" hidden>
+      <h1>Not Found</h1>
+      <p>The requested URL was not found on this server.</p>
+    </div>
+
+    <div id="signIn" class="gate-signin" hidden>
+      <button id="signInButton" type="button">Sign in</button>
+    </div>
+
+    <div id="console" class="console" hidden>
+      <header class="a-top">
+        <div class="a-brand"><svg aria-hidden="true"><use href="#kq-logo" /></svg><div><strong>Kryptex Quest</strong><small>CONSOLE</small></div></div>
+        <div class="a-counters" id="counters"></div>
+        <nav class="a-tabs" id="tabs" role="tablist">
+          <button role="tab" data-tab="map" aria-selected="true">Live map</button>
+          <button role="tab" data-tab="teams" aria-selected="false">Teams</button>
+          <button role="tab" data-tab="log" aria-selected="false">Activity log</button>
+        </nav>
+        <div class="a-user"><span id="who"></span><button type="button" id="signOut">Sign out</button></div>
+      </header>
+      <div id="demoBanner" class="demo-banner" hidden>DEMO DATA · teams and players are invented; stop edits are saved on this device only</div>
+
+      <main class="a-main">
+        <section id="view-map" class="a-view">
+          <div class="map-wrap"><div id="map" class="map-canvas" aria-label="Live campus map"></div>
+            <div class="map-keys"><button type="button" id="tilt">3D</button><button type="button" id="fitAll">Fit campus</button></div>
+            <div id="relocateHint" class="relocate-hint" hidden>Click a spot on the map to move this stop</div>
+          </div>
+          <aside class="a-side">
+            <h3>Stops</h3>
+            <div id="stopList" class="stop-list"></div>
+            <div id="stopEditor" class="stop-editor" hidden></div>
+            <h3>Players <span id="playerCount"></span></h3>
+            <div id="playerList" class="player-list"></div>
+          </aside>
+        </section>
+
+        <section id="view-teams" class="a-view" hidden>
+          <div class="teams-layout">
+            <div id="teamList" class="team-list"></div>
+            <div id="teamDetail" class="team-detail"></div>
+          </div>
+        </section>
+
+        <section id="view-log" class="a-view" hidden>
+          <div class="log-tools">
+            <select id="logKind" aria-label="Event type"><option value="">All events</option></select>
+            <select id="logTeam" aria-label="Team"><option value="">All teams</option></select>
+            <input id="logSearch" type="search" placeholder="Search player, stop, detail…" />
+            <label class="live-toggle"><input type="checkbox" id="logLive" checked /> Live</label>
+            <span id="logCount"></span>
+          </div>
+          <div class="log-scroll"><table class="log-table"><thead><tr><th>Time</th><th>Team</th><th>Player</th><th>Event</th><th>Where</th><th>Result</th><th>Dist</th><th>Detail</th></tr></thead><tbody id="logBody"></tbody></table>
+            <button type="button" id="logMore" class="ghost-button" hidden>Load older events</button></div>
+        </section>
+      </main>
+    </div>
+
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="kq-logo" viewBox="0 0 64 64">
+        <rect x="6" y="9" width="52" height="12" rx="6" fill="#4285F4" /><rect x="6" y="23" width="52" height="12" rx="6" fill="#EA4335" />
+        <rect x="6" y="37" width="52" height="12" rx="6" fill="#FBBC05" /><rect x="14" y="51" width="36" height="6" rx="3" fill="#34A853" />
+      </symbol>
+    </svg>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./admin.js"></script>
+  </body>
+</html>
