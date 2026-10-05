@@ -27,7 +27,7 @@
     </div>
     <!--
     THESIS: Kryptex Quest is a chunky mobile adventure game, not a dashboard: outlined candy keys that press down, studded night-blue panels, hex medals, ribbons, gems and treasure. Refused default: flat dark cards with thin borders and neon glow.
-    OWN-WORLD: ink outline (#0f0728) on everything, night-blue panels (#291d6c to #3d2d94), recessed slots, four candy colours (blue, red, yellow, green) as hi/lo gradients with a lip, Lilita One for display and numbers, Google Sans Text for body, mono only for flags, game-icons glyphs through CSS masks, night key art, an SVG treasure chest, avatar portraits rendered from the 3D explorers, Kenney sounds.
+    OWN-WORLD: ink outline (#12111a) on everything, night-blue panels (#211f2e to #2f2c3f), recessed slots, four candy colours (blue, red, yellow, green) as hi/lo gradients with a lip, Lilita One for display and numbers, Google Sans Text for body, mono only for flags, game-icons glyphs through CSS masks, night key art, an SVG treasure chest, avatar portraits rendered from the 3D explorers, Kenney sounds.
     STORY: the player walks a real night campus, hidden places light up as hex pins, every success pays out: a banner, a sound, a chest.
     FIRST VIEWPORT: login = night skyline key art with the GDG wordmark on top, the outlined title and one big Play key at the bottom; in game = full-bleed map, avatar medallion + gem tracker + GPS lamp, objective plate at the bottom.
     FORM: chunky mobile-game UI (pinned by the user over the assigned cipher-plate roll), seed key e2738707.
@@ -36,7 +36,7 @@
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
       <symbol id="g-logo" viewBox="0 0 48 48">
         <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z" />
-        <path fill="#8b6cf0" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z" />
+        <path fill="#957ede" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z" />
         <path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z" />
         <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z" />
       </symbol>
@@ -96,7 +96,7 @@
       <div id="stopLabels" class="stop-labels"></div>
 
       <header class="hud">
-        <button class="avatar-btn" id="menuButton" type="button" aria-label="Open menu"><img id="hudAvatar" src="./assets/art/portrait-male.png" alt="" width="52" height="52" /><span class="avatar-burger" aria-hidden="true"><i></i><i></i><i></i></span></button>
+        <button class="avatar-btn" id="menuButton" type="button" aria-label="Open menu"><span class="avatar-face"><img id="hudAvatar" src="./assets/art/portrait-male.png" alt="" width="52" height="52" /></span><span class="avatar-burger" aria-hidden="true"><i></i><i></i><i></i></span></button>
         <div class="chip stat"><span class="engrave">Cleared</span><strong id="hudProgress" class="digits">0 / 4</strong><i class="dots" id="hudDots"></i></div>
         <button class="chip gps" id="gpsChip" type="button" aria-label="Location status"><span class="gps-dot"></span><span id="gpsText">GPS</span></button>
       </header>
@@ -114,8 +114,8 @@
       <button class="chip compass-enable" id="compassEnable" type="button" hidden><i data-icon="radar"></i> Tap to enable compass</button>
 
       <div class="side-tools">
-        <button class="round-btn" id="viewReset" type="button" aria-label="Reset camera behind my explorer" hidden><i data-icon="radar"></i></button>
-        <button class="round-btn compass" id="compassButton" type="button" aria-label="Lock north up" aria-pressed="false"><svg class="dial" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="2" opacity=".55"/><path d="M24 4v5M24 39v5M4 24h5M39 24h5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><g id="compassNeedle"><path d="M24 9l5.5 15h-11z" fill="#e8574c" stroke="#0f0728" stroke-width="2" stroke-linejoin="round"/><path d="M24 39l5.5-15h-11z" fill="#f2eeff" stroke="#0f0728" stroke-width="2" stroke-linejoin="round"/><circle cx="24" cy="24" r="2.6" fill="#0f0728"/></g></svg></button>
+        <button class="round-btn recenter" id="viewReset" type="button" aria-label="Recenter on my explorer" hidden><svg class="dial" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="29" fill="#1b1927" stroke="#cfc9e6" stroke-width="4"/><circle cx="32" cy="32" r="11" fill="none" stroke="#ffe28f" stroke-width="4"/><circle cx="32" cy="32" r="3.5" fill="#ffe28f"/><path d="M32 10v10M32 44v10M10 32h10M44 32h10" stroke="#ffe28f" stroke-width="4" stroke-linecap="round"/></svg></button>
+        <button class="round-btn compass" id="compassButton" type="button" aria-label="Lock north up" aria-pressed="false"><svg class="dial" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="29" fill="#1b1927" stroke="#f5c046" stroke-width="4"/><g id="compassNeedle"><g stroke="#cfc9e6" stroke-width="2" stroke-linecap="round"><path d="M32 7v4M32 53v4M7 32h4M53 32h4"/></g><path d="M32 14l7 18H25z" fill="#e8574c" stroke="#12111a" stroke-width="2" stroke-linejoin="round"/><path d="M32 50l-7-18h14z" fill="#f2eeff" stroke="#12111a" stroke-width="2" stroke-linejoin="round"/><text x="32" y="11.5" text-anchor="middle" font-family="Lilita One, sans-serif" font-size="9" fill="#ffe28f">N</text></g><circle cx="32" cy="32" r="3" fill="#f5c046" stroke="#12111a" stroke-width="1.5"/></svg></button>
       </div>
 
       <button class="near-card" id="nearCard" type="button" hidden>
@@ -175,9 +175,9 @@
           <button type="button" data-menu="team"><i class="gi gi-tower-flag"></i> My team</button>
           <button type="button" data-menu="sos"><i class="gi gi-ringing-bell"></i> Need help?</button>
           <button type="button" data-menu="help"><i class="gi gi-scroll-unfurled"></i> How to play</button>
-          <label class="menu-toggle" id="soundToggleRow"><span class="mt-text"><b><i class="gi gi-ringing-bell"></i> Sound</b><small>Game sounds</small></span><input type="checkbox" id="soundToggle" checked /></label>
-          <label class="menu-toggle" id="simToggleRow" hidden><span class="mt-text"><b><i class="gi gi-footsteps"></i> Walking simulator</b><small>Testing off campus</small></span><input type="checkbox" id="simToggle" /></label>
-          <button type="button" data-menu="reset" id="resetRow" hidden>Reset demo progress</button>
+          <label class="menu-toggle" id="soundToggleRow"><i class="gi gi-sparkles"></i><span class="mt-text"><b>Sound</b><small>Game sounds</small></span><input type="checkbox" id="soundToggle" checked /></label>
+          <label class="menu-toggle" id="simToggleRow" hidden><i class="gi gi-footsteps"></i><span class="mt-text"><b>Walking simulator</b><small>Testing off campus</small></span><input type="checkbox" id="simToggle" /></label>
+          <button type="button" data-menu="reset" id="resetRow" hidden><i class="gi gi-hourglass"></i> Reset demo progress</button>
           <button type="button" data-menu="signout" class="danger"><i class="gi gi-exit-door"></i> Sign out</button>
         </div>
         <p class="dialog-note" id="modeNote"></p>
