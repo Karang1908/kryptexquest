@@ -118,3 +118,13 @@ export function alerts() {
     { kind: 'struggling', teamId: 'team2', teamName: 'Null Pointers', stopId: 'library', idx: 0, title: 'Study light', wrong: 6, minutes: 0 },
   ];
 }
+
+/** Same shape as the database's admin_players(): every player, with questions solved. */
+export function players(team, state) {
+  const rows = teams(team, state).flatMap((tm) => tm.members.map((m) => ({
+    id: m.id, name: m.name, email: m.email, teamId: tm.id, teamName: tm.name, isTest: false, finished: Boolean(tm.finishedAt),
+    solves: m.solves, wrong: m.wrong, unlocks: m.unlocks, lastSeen: m.lastSeen,
+  })));
+  ['Faris', 'Leena', 'Hamza'].forEach((name, i) => rows.push({ id: `solo${i}`, name, email: `${name.toLowerCase()}@dubai.bits-pilani.ac.in`, teamId: null, teamName: null, isTest: false, finished: false, solves: 0, wrong: 0, unlocks: 0, lastSeen: null }));
+  return rows;
+}
