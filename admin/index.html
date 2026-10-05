@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
-    <meta name="theme-color" content="#0a0d16" />
+    <meta name="theme-color" content="#05070b" />
     <title>Console</title>
-    <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="../styles.css" />
+    <link rel="icon" type="image/png" href="../assets/brand/favicon.png" />
+    <link rel="preload" href="../assets/fonts/GoogleSans.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../theme.css" />
     <link rel="stylesheet" href="./admin.css" />
   </head>
   <body class="admin">
@@ -17,100 +18,132 @@
       <p>The requested URL was not found on this server.</p>
     </div>
 
-    <div id="signIn" class="gate-signin" hidden>
-      <button id="signInButton" type="button">Sign in</button>
+    <div id="signIn" class="gate-signin atmos" hidden>
+      <div class="gate-card">
+        <img src="../assets/brand/gdg-logo-dark.png" alt="Google Developer Group, BITS Pilani Dubai Campus" width="383" height="64" />
+        <button id="signInButton" type="button" class="primary-button">Sign in to the console</button>
+      </div>
     </div>
 
     <div id="console" class="console" hidden>
       <header class="a-top">
-        <div class="a-brand"><svg aria-hidden="true"><use href="#kq-logo" /></svg><div><strong>Kryptex Quest</strong><small>CONSOLE</small></div></div>
-        <div class="a-counters" id="counters"></div>
-        <nav class="a-tabs" id="tabs" role="tablist">
-          <button role="tab" data-tab="map" aria-selected="true">Live map</button>
-          <button role="tab" data-tab="teams" aria-selected="false">Teams</button>
-          <button role="tab" data-tab="log" aria-selected="false">Activity log</button>
-          <button role="tab" data-tab="content" aria-selected="false">Content</button>
-          <button role="tab" data-tab="photos" aria-selected="false">Photos <span id="photoBadge" class="badge-n" hidden></span></button>
-          <button role="tab" data-tab="event" aria-selected="false">Event <span id="helpBadge" class="badge-n" hidden></span></button>
+        <div class="a-brand"><img src="../assets/brand/gdg-mark.png" alt="" width="34" height="34" /><div><strong>Kryptex Quest</strong><span class="engrave">Console</span></div></div>
+        <nav class="a-tabs" id="tabs" role="tablist" aria-label="Console sections">
+          <button role="tab" data-tab="map" aria-selected="true"><i data-icon="map"></i><span>Live</span></button>
+          <button role="tab" data-tab="teams" aria-selected="false"><i data-icon="users"></i><span>Teams</span></button>
+          <button role="tab" data-tab="content" aria-selected="false"><i data-icon="pin"></i><span>Locations</span></button>
+          <button role="tab" data-tab="photos" aria-selected="false"><i data-icon="camera"></i><span>Photos</span><b id="photoBadge" class="badge-n" hidden></b></button>
+          <button role="tab" data-tab="event" aria-selected="false"><i data-icon="bell"></i><span>Event</span><b id="helpBadge" class="badge-n" hidden></b></button>
         </nav>
-        <div class="a-user"><span id="who"></span><button type="button" id="signOut">Sign out</button></div>
+        <div class="a-user">
+          <button type="button" id="statusPill" class="status-pill" title="Event status: open the Event tab"><i></i><span>Status</span></button>
+          <span id="who" class="who"></span>
+          <button type="button" id="signOut" class="icon-key" aria-label="Sign out" title="Sign out"><i data-icon="logout"></i></button>
+        </div>
       </header>
       <div id="alertBar" class="alert-bar" hidden></div>
-      <div id="demoBanner" class="demo-banner" hidden>DEMO DATA · teams and players are invented; stop edits are saved on this device only</div>
+      <div id="demoBanner" class="demo-banner" hidden>Demo data: teams and players are invented; location edits are saved on this device only</div>
 
       <main class="a-main">
+        <!-- LIVE -->
         <section id="view-map" class="a-view">
-          <div class="map-wrap"><div id="map" class="map-canvas" aria-label="Live campus map"></div>
-            <div class="map-keys"><button type="button" id="tilt">3D</button><button type="button" id="fitAll">Fit campus</button></div>
-            <div id="relocateHint" class="relocate-hint" hidden>Click a spot on the map to move this stop</div>
+          <div class="map-wrap">
+            <div id="map" class="map-canvas" aria-label="Live campus map"></div>
+            <div class="map-stats panel-game" id="counters"></div>
+            <div class="map-keys"><button type="button" id="tilt" class="icon-key" title="Tilt the map">3D</button><button type="button" id="fitAll" class="icon-key" title="Fit everything">Fit</button></div>
+            <div id="relocBar" class="reloc-bar panel-game" hidden></div>
           </div>
           <aside class="a-side">
-            <h3>Stops</h3>
-            <div id="stopList" class="stop-list"></div>
-            <div id="stopEditor" class="stop-editor" hidden></div>
-            <h3>Players <span id="playerCount"></span></h3>
+            <h3 class="side-head"><span>Players</span><b id="playerCount"></b></h3>
             <div id="playerList" class="player-list"></div>
           </aside>
         </section>
 
+        <!-- TEAMS (+ activity log) -->
         <section id="view-teams" class="a-view" hidden>
-          <div class="teams-layout">
-            <div id="teamList" class="team-list"></div>
+          <div class="view-bar">
+            <div class="seg" role="tablist" aria-label="Teams or activity">
+              <button type="button" id="segTeams" role="tab" aria-selected="true">Teams</button>
+              <button type="button" id="segPlayers" role="tab" aria-selected="false">Players</button>
+              <button type="button" id="segLog" role="tab" aria-selected="false">Activity</button>
+            </div>
+          </div>
+          <div id="paneTeams" class="teams-layout">
+            <div class="team-col">
+              <input id="teamSearch" class="field-input" type="search" placeholder="Search teams" aria-label="Search teams" />
+              <div id="teamList" class="team-list"></div>
+            </div>
             <div id="teamDetail" class="team-detail"></div>
           </div>
-        </section>
-
-        <section id="view-log" class="a-view" hidden>
-          <div class="log-tools">
-            <select id="logKind" aria-label="Event type"><option value="">All events</option></select>
-            <select id="logTeam" aria-label="Team"><option value="">All teams</option></select>
-            <input id="logSearch" type="search" placeholder="Search player, stop, detail…" />
-            <label class="live-toggle"><input type="checkbox" id="logLive" checked /> Live</label>
-            <span id="logCount"></span>
+          <div id="panePlayers" class="players-pane" hidden>
+            <div class="log-tools">
+              <input id="plSearch" class="field-input" type="search" placeholder="Search name, email or team" aria-label="Search players" />
+              <select id="plSort" class="field-input" aria-label="Sort players">
+                <option value="solves:desc">Most questions solved</option>
+                <option value="solves:asc">Fewest questions solved</option>
+                <option value="name:asc">Name A to Z</option>
+                <option value="team:asc">Team A to Z</option>
+                <option value="wrong:desc">Most wrong guesses</option>
+                <option value="unlocks:desc">Most unlocks</option>
+                <option value="lastSeen:desc">Seen most recently</option>
+              </select>
+              <button type="button" id="plExport" class="btn">Export CSV</button>
+              <span id="plCount" class="engrave"></span>
+            </div>
+            <div class="log-scroll"><table class="tbl pl-table"><thead><tr>
+              <th><button type="button" data-sort="name">Player</button></th><th><button type="button" data-sort="team">Team</button></th>
+              <th><button type="button" data-sort="solves">Questions solved</button></th><th><button type="button" data-sort="wrong">Wrong</button></th>
+              <th><button type="button" data-sort="unlocks">Unlocks</button></th><th><button type="button" data-sort="lastSeen">Last seen</button></th></tr></thead><tbody id="plBody"></tbody></table></div>
           </div>
-          <div class="log-scroll"><table class="log-table"><thead><tr><th>Time</th><th>Team</th><th>Player</th><th>Event</th><th>Where</th><th>Result</th><th>Dist</th><th>Detail</th></tr></thead><tbody id="logBody"></tbody></table>
-            <button type="button" id="logMore" class="ghost-button" hidden>Load older events</button></div>
+          <div id="paneLog" class="log-pane" hidden>
+            <div class="log-tools">
+              <select id="logKind" class="field-input" aria-label="Event type"><option value="">All events</option></select>
+              <select id="logTeam" class="field-input" aria-label="Team"><option value="">All teams</option></select>
+              <input id="logSearch" class="field-input" type="search" placeholder="Search player, location, detail" />
+              <label class="live-toggle"><input type="checkbox" id="logLive" checked /> Live</label>
+              <span id="logCount" class="engrave"></span>
+            </div>
+            <div class="log-scroll"><table class="log-table"><thead><tr><th>Time</th><th>Team</th><th>Player</th><th>Event</th><th>Where</th><th>Result</th><th>Dist</th><th>Detail</th></tr></thead><tbody id="logBody"></tbody></table>
+              <button type="button" id="logMore" class="ghost-button" hidden>Load older events</button></div>
+          </div>
         </section>
 
+        <!-- LOCATIONS -->
         <section id="view-content" class="a-view" hidden>
           <div class="content-layout">
             <div class="content-list">
-              <button type="button" id="addLocation" class="primary-button">+ Add location</button>
+              <button type="button" id="addLocation" class="primary-button"><i data-icon="plus"></i> Add location</button>
               <div id="locList" class="loc-list"></div>
-              <p class="hint">Order here is the order players walk the trail. Each location's handoff flag unlocks the next one.</p>
+              <p class="hint">The order here is the order teams walk. A location's code, handed in at the base, releases the next one.</p>
             </div>
             <div id="locEditor" class="loc-editor"></div>
           </div>
         </section>
 
-        <section id="view-event" class="a-view" hidden>
-          <div class="event-grid">
-            <div class="panel wide" id="evReady"></div>
-            <div class="panel" id="evStatus"></div>
-            <div class="panel" id="evBroadcast"></div>
-            <div class="panel" id="evSafety"></div>
-            <div class="panel" id="evHelp"></div>
-            <div class="panel wide" id="evStandings"></div>
-            <div class="panel wide" id="evData"></div>
-          </div>
-        </section>
-
+        <!-- PHOTOS -->
         <section id="view-photos" class="a-view" hidden>
-          <div class="log-tools">
-            <select id="photoStatus" aria-label="Status"><option value="pending">Needs review</option><option value="">All</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
-            <span id="photoCount"></span>
+          <div class="view-bar">
+            <select id="photoStatus" class="field-input" aria-label="Status"><option value="pending">Needs review</option><option value="">All</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
+            <span id="photoCount" class="engrave"></span>
           </div>
           <div id="photoList" class="photo-grid"></div>
+        </section>
+
+        <!-- EVENT -->
+        <section id="view-event" class="a-view" hidden>
+          <div class="event-grid">
+            <div class="panel" id="evStatus"></div>
+            <div class="panel" id="evReady"></div>
+            <div class="panel" id="evBroadcast"></div>
+            <div class="panel" id="evHelp"></div>
+            <div class="panel wide" id="evStandings"></div>
+            <details class="panel wide fold"><summary>Safety zones</summary><div id="evSafety"></div></details>
+            <details class="panel wide fold"><summary>Exports and data</summary><div id="evData"></div></details>
+          </div>
         </section>
       </main>
     </div>
 
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-      <symbol id="kq-logo" viewBox="0 0 64 64">
-        <rect x="6" y="9" width="52" height="12" rx="6" fill="#4285F4" /><rect x="6" y="23" width="52" height="12" rx="6" fill="#EA4335" />
-        <rect x="6" y="37" width="52" height="12" rx="6" fill="#FBBC05" /><rect x="14" y="51" width="36" height="6" rx="3" fill="#34A853" />
-      </symbol>
-    </svg>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script type="module" src="./admin.js"></script>
   </body>
