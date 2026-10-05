@@ -96,10 +96,15 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
         ${field('ed-lat', 'Latitude', stop.lat)}${field('ed-lng', 'Longitude', stop.lng)}${field('ed-radius', 'Radius (metres)', stop.radius)}
         <div class="field"><span>Position</span><button type="button" class="btn" id="edPlaceMap">${icon('pin')} Place on the map</button></div>
       </div></section>
-      ${stop.role === 'stop' ? `<section class="panel"><h3 class="sec">How teams find and unlock it</h3><div class="form-grid">
-        <label class="field wide">Hint shown at the base once it is released<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>
-        ${field('ed-eq', 'Entry question (optional; its answer is the entry flag)', stop.entryQuestion || '', 'wide')}
-        ${field('ed-ea', 'Entry flag, typed at the location (blank: unlocks when discovered)', stop.entryAnswer || '', 'wide')}
+      ${stop.role === 'stop' ? `<section class="panel"><h3 class="sec">Find it: the hint</h3><div class="form-grid">
+        <label class="field wide">Hint shown at the base once this location is released<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>
+      </div></section>
+      <section class="panel"><h3 class="sec">Unlock it: the question</h3><p class="hint">Shown at the base with the hint. The team opens the link, solves it, then types the flag when they are standing at the location. Leave the flag empty to unlock on discovery.</p><div class="form-grid">
+        <label class="field wide">Question title<textarea id="ed-eq" rows="2" placeholder="What is the name carved above the door?">${esc(stop.entryQuestion || '')}</textarea></label>
+        ${field('ed-eu', 'Question link (optional, https://...)', stop.entryUrl || '', 'wide')}
+        ${field('ed-ea', 'Flag that unlocks it', stop.entryAnswer || '', 'wide')}
+      </div></section>
+      <section class="panel"><h3 class="sec">Clear it: the handoff</h3><div class="form-grid">
         ${field('ed-exit', 'Location code, shown when cleared and handed in at the base', stop.exitFlag || '', 'wide')}
         <label class="field wide">Next clue, shown when this location is cleared<textarea id="ed-clue">${esc(stop.nextClue || '')}</textarea></label>
       </div></section>` : ''}
@@ -155,7 +160,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
     return {
       id: stop.isNew ? v('#ed-id') : stop.id, role: v('#ed-role') || stop.role, entryMode: v('#ed-mode') || stop.entryMode, place: v('#ed-place'), name: v('#ed-name'), label: v('#ed-label'),
       type: v('#ed-type'), icon: v('#ed-icon'), description: v('#ed-desc'), lat: Number(v('#ed-lat')), lng: Number(v('#ed-lng')), radius: Number(v('#ed-radius')),
-      hint: v('#ed-hint'), entryQuestion: v('#ed-eq'), entryAnswer: v('#ed-ea'), exitFlag: v('#ed-exit'), nextClue: v('#ed-clue'),
+      hint: v('#ed-hint'), entryQuestion: v('#ed-eq'), entryUrl: v('#ed-eu'), entryAnswer: v('#ed-ea'), exitFlag: v('#ed-exit'), nextClue: v('#ed-clue'),
     };
   }
 
