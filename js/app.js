@@ -831,6 +831,7 @@ async function enterGame(user) {
   }
   api.saveProfile(user).catch(() => {});
   const saved = await api.loadAvatar().catch(() => null);
+  if (saved) localStorage.setItem('kq-avatar', saved);   // a returning player on a new phone already has a character: do not ask again
   setAvatar(saved === 'female' ? 'female' : 'male');
   $('#menuName').textContent = user.name;
   $('#menuEmail').textContent = user.email;
@@ -839,6 +840,7 @@ async function enterGame(user) {
   $('#locSim').hidden = !CONFIG.allowSimulator;
   $('#modeNote').textContent = api.hasBackend ? '' : 'Demo mode: sample content, progress saved on this device only.';
   schedulePoll();
+  api.rehearsalAvailable().then((ok) => { S.canRehearse = ok; $('#teamRehearsal').hidden = !ok; syncBonusMenu(); });
   await route();
   if (!localStorage.getItem('kq-avatar')) $('#avatarDialog').showModal();
 }
@@ -923,7 +925,6 @@ async function boot() {
   const user = await api.getUser();
   if (user) await enterGame(user);
   else showLogin(urlError);
-  api.rehearsalAvailable().then((ok) => { S.canRehearse = ok; $('#teamRehearsal').hidden = !ok; syncBonusMenu(); });
 }
 
 $('#googleSignIn').addEventListener('click', async () => {
