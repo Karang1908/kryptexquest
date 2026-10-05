@@ -474,3 +474,11 @@ button.gem:active { transform: translateY(3px); }
 .surprise .flag-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
 .surprise .flag-input { min-width: 0; width: 100%; }
 .surprise { border-color: var(--yellow); }
+
+/* sequential questions: a locked one shows only its number */
+.puzzle.locked { opacity: 0.7; box-shadow: none; background: var(--recess); }
+.puzzle.locked .puzzle-num { background: none; color: var(--muted); }
+.puzzle.locked small { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.q-images { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 8px 0; }
+.q-images a { display: block; border-radius: 12px; overflow: hidden; border: 3px solid var(--ink); background: var(--recess); }
+.q-images img { display: block; width: 100%; max-height: 220px; object-fit: cover; }
