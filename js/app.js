@@ -628,7 +628,7 @@ async function renderBoard() {
     const board = await api.leaderboard();
     const fmt = (r) => (r.finishedAt ? `${clockText((r.elapsedSeconds || 0) * 1000)}` : `${r.flags} flag${r.flags === 1 ? '' : 's'}`);
     $('#boardTitle').textContent = board.status === 'ended' ? 'Final results' : 'Standings';
-    $('#boardBody').innerHTML = board.rows.length ? board.rows.map((r) => `<div class="board-row ${r.teamId === board.me ? 'me' : ''}"><span class="pos">${r.rank}</span><span><strong>${esc(r.name)}</strong><small>${r.stopsCleared} locations · ${r.hubFlags} flags handed in · ${r.players} players</small></span><span class="time">${fmt(r)}</span></div>`).join('') : '<div class="empty">No teams yet.</div>';
+    $('#boardBody').innerHTML = board.rows.length ? board.rows.map((r) => `<div class="board-row ${r.teamId === board.me ? 'me' : ''}"><span class="pos">${r.rank}</span><span><strong>${esc(r.name)}</strong><small>${r.stopsCleared} ${r.stopsCleared === 1 ? 'location' : 'locations'} · ${r.hubFlags} flags in · ${r.players} ${r.players === 1 ? 'player' : 'players'}</small></span><span class="time">${fmt(r)}</span></div>`).join('') : '<div class="empty">No teams yet.</div>';
   } catch (error) { $('#boardBody').textContent = 'Could not load the standings.'; console.warn(error); }
 }
 function openBoard() {
