@@ -5,7 +5,8 @@ body.admin { overflow: hidden; }
 .gate-signin { position: fixed; inset: 0; display: grid; place-items: center; }
 .gate-signin button { padding: 12px 22px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); font-weight: 600; }
 
-.console { position: fixed; inset: 0; display: grid; grid-template-rows: auto auto 1fr; }
+.console { position: fixed; inset: 0; display: flex; flex-direction: column; }
+.console > [hidden] { display: none; }
 .a-top { display: flex; align-items: center; gap: 18px; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .a-brand { display: flex; align-items: center; gap: 10px; }
 .a-brand svg { width: 30px; height: 30px; }
@@ -24,7 +25,7 @@ body.admin { overflow: hidden; }
 .a-user button { padding: 8px 12px; border-radius: 10px; background: var(--surface-2); color: var(--text); }
 .demo-banner { padding: 6px 16px; background: rgba(251, 188, 5, 0.14); color: var(--yellow); font-size: 12px; font-weight: 600; text-align: center; }
 
-.a-main { position: relative; min-height: 0; }
+.a-main { position: relative; min-height: 0; flex: 1; }
 .a-view { position: absolute; inset: 0; min-height: 0; }
 #view-map { display: grid; grid-template-columns: 1fr 360px; }
 .map-wrap { position: relative; min-height: 0; }
