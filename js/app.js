@@ -240,9 +240,12 @@ function rangeBanner(stop) {
 
 /**
  * One question. The real question lives on an external page: the game shows its title and a link, and takes the flag.
- * Photo questions show the clue first; the title and link appear once the photo is verified. Every card is open at once.
+ * Photo questions show the clue first; the title and link appear once the photo is verified. Questions open in order: the next one unlocks when the previous is solved.
  */
 function puzzleCard(stop, p) {
+  if (p.locked) {
+    return `<article class="puzzle locked"><div class="puzzle-head"><span class="puzzle-num">${p.idx + 1}</span><strong>Question ${p.idx + 1}</strong><small>${icon('lock')} LOCKED</small></div></article>`;
+  }
   const id = `${stop.id}:${p.idx}`;
   const photoStage = p.kind === 'photo' && !p.photoCleared && !p.solved;
   const hasPhoto = S.photo?.id === id;
@@ -268,7 +271,7 @@ function puzzleCard(stop, p) {
 }
 
 /** The unlock question: its text, plus a link to the real question page when the organiser set one. */
-const entryLink = (stop) => (stop.entryUrl ? `<a class="q-link" href="${esc(stop.entryUrl)}" target="_blank" rel="noopener noreferrer">Open the question ${icon('out')}</a>` : '');
+const entryLink = (stop) => `${(stop.entryImages || []).length ? `<div class="q-images">${stop.entryImages.map((src) => `<a href="${esc(src)}" target="_blank" rel="noopener noreferrer"><img src="${esc(src)}" alt="Question image" loading="lazy" /></a>`).join('')}</div>` : ''}${stop.entryUrl ? `<a class="q-link" href="${esc(stop.entryUrl)}" target="_blank" rel="noopener noreferrer">Open the question ${icon('out')}</a>` : ''}`;
 function locationCard(stop, index, range) {
   const title = stop.state === 'locked' ? `Location ${index + 1}` : stop.place;
   const chip = stop.state === 'cleared' ? 'CLEARED' : stop.state === 'open' ? 'UNLOCKED' : stop.discovered ? 'DISCOVERED' : stop.released ? 'TO FIND' : 'LOCKED';
@@ -278,7 +281,7 @@ function locationCard(stop, index, range) {
   if (stop.state === 'cleared') lines.push(handed ? `<p class="loc-note">${icon('check')} Code handed in.</p>` : `<p class="loc-note">${icon('check')} Cleared. Your code: <code>${esc(stop.exitFlag)}</code>. Hand it in below to release the next location.</p>`);
   else if (stop.state === 'open') lines.push('<p class="loc-note">Unlocked. Solve its questions there.</p>');
   else if (stop.released) {
-    if (stop.entryQuestion) lines.push(`<p class="loc-hint">${icon('note')} ${esc(stop.entryQuestion)}</p>${entryLink(stop)}<p class="loc-note">The answer is this location's entry flag. Type it when you are there.</p>`);
+    if (stop.entryQuestion || stop.entryImages?.length) lines.push(`${stop.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(stop.entryQuestion)}</p>` : ''}${entryLink(stop)}<p class="loc-note">The answer is this location's entry flag. Type it when you are there.</p>`);
     else if (stop.entryFlag) lines.push(`<p class="loc-note">Entry flag: <code>${esc(stop.entryFlag)}</code>. Type it when you are there.</p>`);
     lines.push(`<p class="loc-note">${stop.discovered ? `${icon('pin')} Discovered. Go back and unlock it.` : `${icon('radar')} Not found yet. Explore the campus.`}</p>`);
   } else lines.push(`<p class="loc-note">${icon('lock')} Hand in the code from Location ${stop.prevOrd} below to get this location's hint and entry question.${stop.discovered ? ' (You already found it, so it stays on your map.)' : ''}</p>`);
@@ -305,7 +308,7 @@ function renderHubSheet(hub) {
       body += `<div class="section-title">Your next location</div>
         <article class="stop-card next ${next.state}"><div class="loc-head"><span class="loc-num">${next.ord}</span><strong>${next.discovered ? esc(next.place) : `Location ${next.ord}`}</strong><span class="chip-s">${next.state === 'open' ? 'UNLOCKED' : next.discovered ? 'FOUND' : 'TO FIND'}</span></div>
         ${next.hint ? `<p class="loc-hint">${icon('bulb')} ${esc(next.hint)}</p>` : ''}
-        ${next.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(next.entryQuestion)}</p>${entryLink(next)}<p class="loc-note">The answer is this location's entry flag. Type it when you are there.</p>` : next.entryFlag ? `<p class="loc-note">Entry flag: <code>${esc(next.entryFlag)}</code>. Type it when you are there.</p>` : ''}
+        ${next.entryQuestion || next.entryImages?.length ? `${next.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(next.entryQuestion)}</p>` : ''}${entryLink(next)}<p class="loc-note">The answer is this location's entry flag. Type it when you are there.</p>` : next.entryFlag ? `<p class="loc-note">Entry flag: <code>${esc(next.entryFlag)}</code>. Type it when you are there.</p>` : ''}
         <p class="loc-note">${status}</p></article>`;
     } else if (entered.length < needed) {
       body += `<div class="section-title">Your next location</div><article class="stop-card"><p class="loc-note">${icon('lock')} Hand in the code you are holding to get your next hint.</p></article>`;
@@ -338,7 +341,7 @@ function renderStopSheet(stop) {
     body = `<div class="gate"><h3>${icon('lock')} Locked</h3><p>You found it, but locations must be unlocked <b>in order</b>. Hand in the code from <b>Location ${stop.prevOrd}</b> at the base (the vending machine area) to get this location's hint and entry question. It stays on your map.</p><button class="primary-button" type="button" data-action="open-hub">Open the base</button></div>`;
   } else if (!unlocked) {
     body = `<div class="gate"><h3>${icon('unlock')} Ready to unlock</h3>
-      ${stop.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(stop.entryQuestion)}</p>${entryLink(stop)}` : stop.entryFlag ? `<p>Your entry flag: <code>${esc(stop.entryFlag)}</code></p>` : ''}
+      ${stop.entryQuestion || stop.entryImages?.length ? `${stop.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(stop.entryQuestion)}</p>` : ''}${entryLink(stop)}` : stop.entryFlag ? `<p>Your entry flag: <code>${esc(stop.entryFlag)}</code></p>` : ''}
       ${stop.needsFlag ? `<p class="loc-note">Type this location's entry flag to unlock it.</p>
       <form class="flag-row" data-form="unlock"><input class="flag-input" name="gate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{ENTRY_FLAG}" aria-label="Entry flag" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Unlock</button></form>`
       : '<p class="loc-note">No flag needed: it unlocks by itself.</p>'}</div>`;
