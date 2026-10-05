@@ -1,18 +1,18 @@
 ---
 name: Kryptex Quest
-description: A chunky mobile adventure game at night: outlined candy keys, studded panels, hex medals and treasure in the four Google colours.
+description: A chunky mobile adventure game at night in purple with white star dots: outlined candy keys, studded panels, hex medals and treasure, with softened Google red, yellow and green.
 colors:
-  ink: "#070a22"
-  night: "#0a0f33"
-  panel-top: "#1d2878"
-  panel-bottom: "#141c5a"
+  ink: "#0f0728"
+  night: "#150a36"
+  panel-top: "#3d2d94"
+  panel-bottom: "#291d6c"
   raised: "#1b2670"
   recess: "#070b2a"
   text: "#f4f6ff"
   muted: "#aab5e6"
-  blue: "#4285f4"
-  blue-hi: "#7db1ff"
-  blue-lo: "#2a62d6"
+  primary: "#8b6cf0"
+  primary-hi: "#b8a2ff"
+  primary-lo: "#6d48d9"
   red: "#ea4335"
   red-hi: "#ff8a7e"
   red-lo: "#cf2a1d"
@@ -39,7 +39,7 @@ rounded:
   sheet: "28px"
 components:
   key-primary:
-    backgroundColor: "{colors.blue}"
+    backgroundColor: "{colors.primary}"
     textColor: "#ffffff"
     rounded: "{rounded.key}"
     height: "52px"
@@ -61,7 +61,7 @@ components:
 Night Quest. A mobile adventure game skin: everything has a thick ink outline, buttons are candy keys with a lip that press down 5px, panels are studded night-blue slabs, fields are dark recessed slots, status is a hex medal. Success always pays out (banner, sound, chest). The four Google colours are the four candies and always carry state: grey = found but locked, blue = open, green = cleared, red = the base, yellow = go / attention.
 
 ## Colors
-Ink `#070a22` outlines everything. Night-blue panels with a top highlight. Each candy has hi/base/lo/lip so gradients and lips stay consistent. Use tints (`-ink` variants) for coloured text on dark. Never add new hues.
+Ink `#0f0728` outlines everything. Purple panels with white star dots with a top highlight. Each candy has hi/base/lo/lip so gradients and lips stay consistent. Use tints (`-ink` variants) for coloured text on dark. Never add new hues.
 
 ## Typography
 Lilita One for titles, buttons, numbers and names, outlined with a heavy ink stroke when set large. Google Sans Text for body copy (brand font). Monospace only for flags, location codes and coordinates.
