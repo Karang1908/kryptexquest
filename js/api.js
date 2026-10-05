@@ -219,7 +219,7 @@ export async function createTeam(name) {
   if (clean.length < 2 || clean.length > 24) return withView({ ok: false, error: 'Team names are 2 to 24 characters.' });
   const user = readJson(KEYS.user, { name: 'Demo Explorer' });
   const code = Array.from({ length: 6 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 31)]).join('');
-  writeJson(KEYS.team, { id: 'demo-team', name: clean, code, locked: false, leaderId: 'demo', me: 'demo', min: 2, max: 4, members: [{ id: 'demo', name: user.name, isLeader: true, avatar: localStorage.getItem('kq-avatar') || 'male' }] });
+  writeJson(KEYS.team, { id: 'demo-team', name: clean, code, locked: false, leaderId: 'demo', me: 'demo', min: 1, max: 4, members: [{ id: 'demo', name: user.name, isLeader: true, avatar: localStorage.getItem('kq-avatar') || 'male' }] });
   return withView({ ok: true });
 }
 export async function joinTeam(code) {
@@ -227,7 +227,7 @@ export async function joinTeam(code) {
   if (demoTeam()) return withView({ ok: false, error: 'You are already in a team.' });
   if (norm(code) !== 'DEMO42') return withView({ ok: false, error: 'No team has that code. (Demo mode: try DEMO42)' });
   const user = readJson(KEYS.user, { name: 'Demo Explorer' });
-  writeJson(KEYS.team, { id: 'demo-team', name: 'Demo Squad', code: 'DEMO42', locked: false, leaderId: 'mate1', me: 'demo', min: 2, max: 4, members: [
+  writeJson(KEYS.team, { id: 'demo-team', name: 'Demo Squad', code: 'DEMO42', locked: false, leaderId: 'mate1', me: 'demo', min: 1, max: 4, members: [
     { id: 'mate1', name: 'Priya (demo)', isLeader: true, avatar: 'female' },
     { id: 'demo', name: user.name, isLeader: false, avatar: localStorage.getItem('kq-avatar') || 'male' }] });
   return withView({ ok: true });
@@ -248,7 +248,7 @@ export async function lockTeam() {
   if (hasBackend) return rpc('lock_team');
   const team = demoTeam();
   if (!team || team.leaderId !== 'demo') return withView({ ok: false, error: 'Only the team leader can lock the team.' });
-  if (team.members.length < 2) return withView({ ok: false, error: 'You need at least 2 players to lock in.' });
+  if (team.members.length < 1) return withView({ ok: false, error: 'Your team is empty.' });
   team.locked = true; writeJson(KEYS.team, team);
   return withView({ ok: true });
 }
@@ -337,13 +337,15 @@ export async function adminReorderLocations(ids) {
 }
 export async function adminSaveQuestion(q) {
   if (hasBackend) return adminRpc('admin_save_puzzle', { p: q });
-  if (!q.title?.trim() || !q.prompt?.trim()) return { ok: false, error: 'Title and clue / question text are required.' };
+  const url = String(q.questionUrl || '').trim();
+  if (!q.title?.trim()) return { ok: false, error: 'A question needs a title.' };
+  if (q.kind === 'photo' && !q.prompt?.trim()) return { ok: false, error: 'A photo question needs a clue describing the object to find.' };
   if (!q.flag?.trim()) return { ok: false, error: 'Every question needs its answer flag.' };
-  if (q.kind === 'photo' && !q.question?.trim()) return { ok: false, error: 'A photo question needs the question that appears after the photo.' };
+  if (url && !/^https?:\/\/\S+$/i.test(url)) return { ok: false, error: 'The question link must start with http:// or https://' };
   const content = demoContent();
   const stop = content.find((s) => s.id === q.stop && s.role !== 'hub');
   if (!stop) return { ok: false, error: 'Unknown location.' };
-  const row = { title: q.title.trim(), prompt: q.prompt.trim(), kind: q.kind, flag: q.flag.trim(), question: q.kind === 'photo' ? q.question.trim() : null };
+  const row = { title: q.title.trim(), prompt: String(q.prompt || '').trim(), kind: q.kind, flag: q.flag.trim(), questionUrl: url || null };
   let idx = q.idx;
   if (idx == null) { stop.puzzles.push({ ...row, refs: [] }); idx = stop.puzzles.length - 1; }
   else stop.puzzles[idx] = { ...stop.puzzles[idx], ...row };
@@ -456,6 +458,14 @@ export async function adminLive() {
   if (error) throw error;
   return data;
 }
+/** Every signed-up player with how many questions they solved (for the report). */
+export async function adminPlayers() {
+  if (!hasBackend) return demoAdmin.players(demoTeam(), demoState());
+  const { data, error } = await (await supabase()).rpc('admin_players');
+  if (error) throw error;
+  return data;
+}
+
 export async function adminTeams() {
   if (!hasBackend) return demoAdmin.teams(demoTeam(), demoState());
   const { data, error } = await (await supabase()).rpc('admin_teams');
@@ -520,6 +530,7 @@ export async function adminTeamAction(p) {
     case 'reset_progress': writeJson(KEYS.state, engine.emptyState()); return { ok: true };
     case 'check_in': state.startedAt ||= Date.now(); break;
     case 'clear_finish': state.finishedAt = null; break;
+    case 'open_stop': if (stop) { if (!state.unlocked.includes(stop.id)) state.unlocked.push(stop.id); if (!(state.discovered ||= []).includes(stop.id)) state.discovered.push(stop.id); } break;
     case 'grant_stop': if (stop) { if (!state.unlocked.includes(stop.id)) state.unlocked.push(stop.id); if (!(state.discovered ||= []).includes(stop.id)) state.discovered.push(stop.id); stop.puzzles.forEach((_, i) => { state.solved[key(i)] ||= { by: null, at: Date.now() }; }); } break;
     case 'grant_puzzle': if (stop) { if (!state.unlocked.includes(stop.id)) state.unlocked.push(stop.id); if (!(state.discovered ||= []).includes(stop.id)) state.discovered.push(stop.id); state.solved[key(p.idx)] ||= { by: null, at: Date.now() }; } break;
     case 'revoke_puzzle': delete state.solved[key(p.idx)]; state.finishedAt = null; break;
