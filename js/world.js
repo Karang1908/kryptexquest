@@ -5,8 +5,8 @@ import { createScene3D } from './scene3d.js';
 import { stopIcon } from './icons.js';
 
 const ANIM = { idle: 'CharacterArmature|Idle', walk: 'CharacterArmature|Walk', run: 'CharacterArmature|Run' };
-// Pokémon GO camera: low, tilted far enough to show the horizon, wide field of view, explorer dead centre.
-const CAMERA = { zoom: 20.4, pitch: 64, fov: 58 };
+// Pokémon GO camera: low, tilted far enough to show the horizon, wide field of view, explorer dead centre. Starts close in so the explorer fills the screen.
+const CAMERA = { zoom: 20.6, pitch: 64, fov: 70 };
 const LABEL_RANGE_M = 260;
 const FEET_Y = 0.74;            // where the explorer's feet stand, as a fraction of the screen height. Fixed on purpose: tying it to the "next signal" card made the camera jump when the card appeared
 const shortestAngle = (from, to) => ((to - from + 540) % 360) - 180;
