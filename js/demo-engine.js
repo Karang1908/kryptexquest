@@ -74,7 +74,7 @@ export function buildView({ content, state, game, announcements = [], team, now 
       id: s.id, ord: s.ord, role: s.role, entryMode: s.entryMode, discovered: d, released: r, needsFlag: Boolean(s.entryAnswer),
       name: hide(s.name), place: hide(s.place), label: hide(s.label), type: hide(s.type), icon: hide(s.icon), lat: hide(s.lat), lng: hide(s.lng), radius: hide(s.radius),
       description: hide(s.description),
-      hint: r ? s.hint || '' : null, entryQuestion: r ? s.entryQuestion || null : null, entryFlag: r && !s.entryQuestion ? s.entryAnswer || null : null,
+      hint: r ? s.hint || '' : null, entryQuestion: r ? s.entryQuestion || null : null, entryUrl: r ? s.entryUrl || null : null, entryFlag: r && !s.entryQuestion ? s.entryAnswer || null : null,
       prevOrd: prevStop(content, s)?.ord ?? null,
       state: cleared ? 'cleared' : open ? 'open' : 'locked', puzzleCount: s.puzzles.length,
       exitFlag: cleared ? s.exitFlag : null, nextClue: cleared ? s.nextClue : null,
