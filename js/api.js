@@ -300,6 +300,10 @@ export async function adminSaveLocation(stop) {
   const id = String(stop.id || '').trim().toLowerCase();
   const role = stop.role || 'stop';
   if (!/^[a-z0-9][a-z0-9_-]{1,29}$/.test(id)) return { ok: false, error: 'Location id: 2-30 characters, a-z 0-9 - _' };
+  if (!['hub', 'stop', 'bonus'].includes(role) || !['chain', 'open'].includes(stop.entryMode || 'chain')) return { ok: false, error: 'Unknown role or entry mode.' };
+  const lat = Number(stop.lat); const lng = Number(stop.lng); const radius = stop.radius === '' || stop.radius == null ? 50 : Number(stop.radius);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ok: false, error: 'Latitude / longitude are not valid.' };
+  if (!Number.isFinite(radius) || radius < 5 || radius > 500) return { ok: false, error: 'Radius must be 5 to 500 m.' };
   if (!stop.place?.trim() || !stop.name?.trim()) return { ok: false, error: 'Place name and quest title are required.' };
   if (role === 'stop' && (!stop.exitFlag?.trim() || !stop.nextClue?.trim())) return { ok: false, error: 'A location needs its handoff flag and a next clue.' };
   const content = demoContent();
@@ -307,7 +311,7 @@ export async function adminSaveLocation(stop) {
   const at = content.findIndex((s) => s.id === id);
   const fields = {
     id, role, entryMode: stop.entryMode || 'chain', name: stop.name.trim(), place: stop.place.trim(), label: stop.label || 'NEW STOP', type: stop.type || (role === 'hub' ? 'hub' : 'custom'),
-    icon: stop.icon || (role === 'hub' ? '⌂' : '◆'), lat: Number(stop.lat), lng: Number(stop.lng), radius: Number(stop.radius) || 50, description: stop.description || '',
+    icon: stop.icon || (role === 'hub' ? '⌂' : '◆'), lat, lng, radius, description: stop.description || '',
     hint: stop.hint || '', entryQuestion: stop.entryQuestion?.trim() || null, entryAnswer: stop.entryAnswer?.trim() || null, exitFlag: stop.exitFlag?.trim() || null, nextClue: stop.nextClue?.trim() || null,
   };
   if (at >= 0) content[at] = { ...content[at], ...fields };
@@ -520,6 +524,7 @@ export async function adminTeamAction(p) {
     case 'grant_puzzle': if (stop) { if (!state.unlocked.includes(stop.id)) state.unlocked.push(stop.id); if (!(state.discovered ||= []).includes(stop.id)) state.discovered.push(stop.id); state.solved[key(p.idx)] ||= { by: null, at: Date.now() }; } break;
     case 'revoke_puzzle': delete state.solved[key(p.idx)]; state.finishedAt = null; break;
     case 'grant_hub_flag': if (stop && !state.hubFlags.includes(stop.id)) state.hubFlags.push(stop.id); break;
+    case 'move_member': return { ok: true, note: 'Demo: moving players between teams is not simulated.' };
     default: return { ok: false, error: 'Unknown action.' };
   }
   writeJson(KEYS.team, team); writeJson(KEYS.state, state);
