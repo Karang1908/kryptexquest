@@ -54,7 +54,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
     const c = mapCenter();
     const n = playable().length + 1;
     const hasHub = C.stops.some((s) => s.role === 'hub');
-    return { id: '', ord: n, role: hasHub ? 'stop' : 'hub', entryMode: n === 1 ? 'hub' : 'chain', name: '', place: '', label: `${String(n).padStart(2, '0')} / NEW STOP`, type: 'custom', icon: '◆', lat: c.lat, lng: c.lng, radius: 50, description: '', hint: '', entryQuestion: '', entryAnswer: '', exitFlag: 'KQ{}', nextClue: '', puzzles: [], isNew: true };
+    return { id: '', ord: n, role: hasHub ? 'stop' : 'hub', entryMode: 'chain', name: '', place: '', label: `${String(n).padStart(2, '0')} / NEW STOP`, type: 'custom', icon: '◆', lat: c.lat, lng: c.lng, radius: 50, description: '', hint: '', entryQuestion: '', entryAnswer: '', exitFlag: 'KQ{}', nextClue: '', puzzles: [], isNew: true };
   }
 
   function render() {
@@ -94,7 +94,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
         <label class="field wide">DESCRIPTION<textarea id="ed-desc">${esc(stop.description)}</textarea></label>
         ${field('ed-lat', 'LATITUDE', stop.lat)}
         ${field('ed-lng', 'LONGITUDE', stop.lng)}
-        <div class="field"><span>POSITION</span><button type="button" class="btn" id="edPlace">Place on the map…</button></div>
+        <div class="field"><span>POSITION</span><button type="button" class="btn" id="edPlaceMap">Place on the map…</button></div>
         ${isHubStop || stop.role === 'bonus' ? '' : `<label class="field wide">HINT SHOWN AT THE BASE ONCE RELEASED (HOW PLAYERS FIND THIS HIDDEN PLACE)<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>`}
         ${stop.role === 'stop' ? `<label class="field wide">WHEN DOES THE BASE RELEASE ITS HINT?<select id="ed-mode">${modeOptions}</select></label>` : ''}
         ${stop.role === 'stop' ? `${field('ed-eq', 'ENTRY QUESTION (OPTIONAL, SHOWN AT THE BASE ONCE RELEASED; ITS ANSWER IS THE ENTRY FLAG)', stop.entryQuestion || '', 'wide')}${field('ed-ea', 'ENTRY FLAG (TYPED AT THE LOCATION TO UNLOCK IT; BLANK = UNLOCKS WHEN DISCOVERED)', stop.entryAnswer || '', 'wide')}` : ''}
@@ -103,7 +103,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
       </div>
       <div class="btn-row"><button type="button" class="btn save" id="edSaveLoc">${stop.isNew ? 'Create location' : 'Save location'}</button>
         ${stop.isNew ? '<button type="button" class="btn" id="edCancelNew">Cancel</button>' : `<button type="button" class="btn" id="edQr">QR code</button><button type="button" class="btn danger" id="edDeleteLoc">Delete</button>`}</div></div>
-      ${stop.isNew || isHubStop ? (stop.isNew ? '<p class="hint">Create the location first, then add its questions.</p>' : '<p class="hint">The base has no questions. Players check in here, answer base questions for hub-unlocked locations, and hand in flags.</p>')
+      ${stop.isNew || isHubStop ? (stop.isNew ? '<p class="hint">Create the location first, then add its questions.</p>' : '<p class="hint">The base has no questions. Players check in here, read each released location\'s hint and entry question, and hand in location codes.</p>')
         : `<div class="btn-row"><button type="button" class="btn" data-add-q="photo">+ Photo question (clue, photo, then question)</button><button type="button" class="btn" data-add-q="flag">+ Flag question</button></div>${questions || '<div class="empty">No questions yet. Aim for 2-3 per location.</div>'}`}`;
   }
 
@@ -192,7 +192,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
       if (refPaths.length) await api.adminRemoveFiles(refPaths);
       C.selected = null; await changed('Location deleted.');
     }
-    if (t.id === 'edPlace') {
+    if (t.id === 'edPlaceMap') {
       if (stop.isNew) return toast('Create the location first, then place it on the map.');
       placeOnMap(stop.id);
     }
