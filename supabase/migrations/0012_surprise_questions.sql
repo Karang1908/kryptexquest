@@ -60,6 +60,7 @@ begin
       'description', case when f.d then s.description end,
       'hint', case when f.r then x.hint end,
       'entryQuestion', case when f.r then x.entry_question end,
+      'entryUrl', case when f.r then x.entry_url end,
       'entryFlag', case when f.r and x.entry_question is null then x.entry_answer end,
       'prevOrd', (select p.ord from stops p where p.role = 'stop' and p.ord < s.ord order by p.ord desc limit 1),
       'state', case when stop_is_clear(v_team.id, s.id) then 'cleared' when stop_open(v_team.id, s.id) then 'open' else 'locked' end,
