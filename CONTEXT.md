@@ -61,6 +61,12 @@ Event tab: start / pause / end (plus optional scheduled start and hard end), bro
 - **Location gems in the HUD**: one hex gem per location, tappable from anywhere once discovered (grey locked, purple open, green cleared).
 - **Players report** (console, Teams > Players): every player with questions solved, wrong guesses, unlocks and last seen; click a header or use the sort menu; CSV export. Backed by `admin_players()`.
 
+### Rules added after migration 0010 (0011 to 0013)
+- **Unlock question** (0011, 0013): title, optional link and optional images (public `question-images` bucket, up to 6) per location, set in the console under "Unlock it: the question". Shown at the base once the location is released.
+- **Surprise question** (0012): console Event tab, "Surprise question". Dropping one announces it on every phone and puts it at the top of the base sheet; each team answers once. Not part of finishing or the leaderboard. Input is enabled only when standing at the base (UI rule; the server does not check position).
+- **Questions in a location are sequential** (0013 `question_locked`): later ones show only their number and "Locked"; `submit_flag` and `record_photo_clear` refuse skipping ahead. Mirrored in `js/demo-engine.js`.
+- Camera starts closer (zoom 20.6) with a wider field of view (70).
+
 ### Console layout (revamp)
 Navbar: Live · Teams · Locations · Photos · Event, plus a status lamp for the event clock and sign-out. Activity log lives inside Teams (Teams | Activity). Live has the map with floating stats and a move bar for relocating a location (click a pin); Locations is a sectioned editor (Basics, Where, How teams find and unlock it, Questions; More options folded); Event folds Safety and Exports.
 
