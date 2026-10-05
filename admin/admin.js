@@ -214,7 +214,8 @@ $('#stopEditor').addEventListener('click', async (e) => {
     A.stops = await api.adminStops();
     const stop = stopById(id);
     A.draft = { lat: stop.lat, lng: stop.lng, radius: stop.radius, place: stop.place, name: stop.name };
-    A.stopMarkers.get(id).el.querySelector('.stop-label').textContent = stop.place;
+    const marker = A.stopMarkers.get(id).el;
+    marker.querySelector('.stop-label').textContent = stop.place; marker.setAttribute('aria-label', stop.place);
     renderStops(); toast(`${stop.place} saved. Players see the new spot on their next load.`);
   }
 });
@@ -280,7 +281,7 @@ async function refreshTeams() {
   try { A.teams = await api.adminTeams(); } catch (error) { console.warn(error); return; }
   fillTeamFilter();
   renderTeamList();
-  if (A.selectedTeam) await renderTeamDetail();
+  await renderTeamDetail();
 }
 
 function renderTeamList() {
