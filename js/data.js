@@ -8,10 +8,10 @@
 //    code releases the next location's hint + entry question there (entryMode 'chain'; 'open' = released after check-in).
 //  - The answer to the entry question is the location's ENTRY FLAG: type it at the (discovered) location to unlock it.
 //    With no question set, the base shows the entry flag itself. With no entry flag, discovering it unlocks it.
-//  - Each location has 2-3 puzzles. A photo puzzle shows a clue; photograph the object and the real question appears;
-//    its answer is a flag. A flag puzzle shows its question directly.
+//  - Each location has 2-3 puzzles. A photo puzzle shows a clue; photograph the object and the question's title + link appear;
+//    the real question lives on an external page, its answer is a flag typed here. A flag puzzle shows its title + link directly.
 //  - Clearing a location reveals its CODE. Hand it in at the base: that releases the next location, and when every code is in
-//    the quest is finished and a bonus question appears (role 'bonus', needs no location).
+//    the quest is finished (time, rank and flags are shown). There is no bonus question.
 export const DEMO_STOPS = [
   {
     id: 'base', ord: 0, role: 'hub', entryMode: 'open', name: 'Base Camp', place: 'Vending Machine Area', label: 'BASE', type: 'hub', icon: '⌂',
@@ -24,9 +24,9 @@ export const DEMO_STOPS = [
     hint: 'Where every visitor first walks in.', entryQuestion: 'Demo: what unlocks the first location? Type KQ{ENTER_LOBBY}.', entryAnswer: 'KQ{ENTER_LOBBY}', qrToken: 'demolobby',
     exitFlag: 'KQ{OPEN_BOOK}', nextClue: 'A place where you study, search, and get lost in stories.',
     puzzles: [
-      { title: 'Emergency eyes', kind: 'photo', prompt: 'Find the red device used to alert people in an emergency.', question: 'Photo verified. Demo question: type KQ{ALARM}.', flag: 'KQ{ALARM}' },
-      { title: 'First contact', kind: 'flag', prompt: 'Demo question: type KQ{HELLO_CAMPUS} to say hello.', flag: 'KQ{HELLO_CAMPUS}' },
-      { title: 'The last digit', kind: 'flag', prompt: 'Demo question: type KQ{LOBBY_CLEAR} to finish this location.', flag: 'KQ{LOBBY_CLEAR}' },
+      { title: 'Emergency eyes', kind: 'photo', prompt: 'Find the red device used to alert people in an emergency.', questionUrl: 'https://example.org/kryptex/lobby-1', flag: 'KQ{ALARM}' },
+      { title: 'First contact', kind: 'flag', prompt: 'Demo question: type KQ{HELLO_CAMPUS} to say hello.', questionUrl: 'https://example.org/kryptex/lobby-2', flag: 'KQ{HELLO_CAMPUS}' },
+      { title: 'The last digit', kind: 'flag', prompt: 'Demo question: type KQ{LOBBY_CLEAR} to finish this location.', questionUrl: 'https://example.org/kryptex/lobby-3', flag: 'KQ{LOBBY_CLEAR}' },
     ],
   },
   {
@@ -35,8 +35,8 @@ export const DEMO_STOPS = [
     hint: 'Where books stand shoulder to shoulder.', entryQuestion: 'Demo: type KQ{ENTER_LIBRARY} to unlock the library.', entryAnswer: 'KQ{ENTER_LIBRARY}', qrToken: 'demolibrary',
     exitFlag: 'KQ{BUILD_IDEA}', nextClue: 'Where hands and tools turn ideas into things.',
     puzzles: [
-      { title: 'Study light', kind: 'photo', prompt: 'Find the object used to light a study desk.', question: 'Photo verified. Demo question: type KQ{BRIGHT_MIND}.', flag: 'KQ{BRIGHT_MIND}' },
-      { title: 'Shelf signal', kind: 'flag', prompt: 'Demo question: type KQ{STACKS}.', flag: 'KQ{STACKS}' },
+      { title: 'Study light', kind: 'photo', prompt: 'Find the object used to light a study desk.', questionUrl: 'https://example.org/kryptex/library-1', flag: 'KQ{BRIGHT_MIND}' },
+      { title: 'Shelf signal', kind: 'flag', prompt: 'Demo question: type KQ{STACKS}.', questionUrl: 'https://example.org/kryptex/library-2', flag: 'KQ{STACKS}' },
     ],
   },
   {
@@ -45,8 +45,8 @@ export const DEMO_STOPS = [
     hint: 'Where experiments take shape.', entryQuestion: 'Demo: type KQ{ENTER_LAB}.', entryAnswer: 'KQ{ENTER_LAB}', qrToken: 'demolab',
     exitFlag: 'KQ{GREEN_SIGNAL}', nextClue: 'Go where the campus opens up to the sky.',
     puzzles: [
-      { title: 'Safety first', kind: 'photo', prompt: 'Find a clearly marked exit or safety sign.', question: 'Photo verified. Demo question: type KQ{SAFE_ROUTE}.', flag: 'KQ{SAFE_ROUTE}' },
-      { title: 'The circuit', kind: 'flag', prompt: 'Demo question: type KQ{CIRCUIT}.', flag: 'KQ{CIRCUIT}' },
+      { title: 'Safety first', kind: 'photo', prompt: 'Find a clearly marked exit or safety sign.', questionUrl: 'https://example.org/kryptex/lab-1', flag: 'KQ{SAFE_ROUTE}' },
+      { title: 'The circuit', kind: 'flag', prompt: 'Demo question: type KQ{CIRCUIT}.', questionUrl: 'https://example.org/kryptex/lab-2', flag: 'KQ{CIRCUIT}' },
     ],
   },
   {
@@ -55,17 +55,8 @@ export const DEMO_STOPS = [
     hint: 'Where the campus opens up to the sky.', entryQuestion: null, entryAnswer: 'KQ{ENTER_YARD}', qrToken: 'democourtyard',
     exitFlag: 'KQ{QUEST_CLEAR}', nextClue: 'Return to the base with every flag you found.',
     puzzles: [
-      { title: 'Living clue', kind: 'photo', prompt: 'Find a tree or planted greenery.', question: 'Photo verified. Demo question: type KQ{ROOTED}.', flag: 'KQ{ROOTED}' },
-      { title: 'Open air', kind: 'flag', prompt: 'Demo question: type KQ{OUTSIDE}.', flag: 'KQ{OUTSIDE}' },
-    ],
-  },
-  {
-    id: 'vault', ord: 5, role: 'bonus', entryMode: 'open', name: 'Bonus Question', place: 'The Kryptex Vault', label: 'BONUS', type: 'bonus', icon: '★',
-    lat: 25.1319, lng: 55.41905, radius: 40, description: 'An extra question for teams that found every location. Answer it from anywhere.',
-    hint: 'Revealed once every code is handed in at the base.', entryQuestion: null, entryAnswer: null, qrToken: 'demovault',
-    exitFlag: null, nextClue: null,
-    puzzles: [
-      { title: 'Kryptex found', kind: 'flag', prompt: 'Demo bonus question: type KQ{FOUND_IT}.', flag: 'KQ{FOUND_IT}' },
+      { title: 'Living clue', kind: 'photo', prompt: 'Find a tree or planted greenery.', questionUrl: 'https://example.org/kryptex/courtyard-1', flag: 'KQ{ROOTED}' },
+      { title: 'Open air', kind: 'flag', prompt: 'Demo question: type KQ{OUTSIDE}.', questionUrl: 'https://example.org/kryptex/courtyard-2', flag: 'KQ{OUTSIDE}' },
     ],
   },
 ];
