@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import { distanceM, bearingDeg } from './geo.js';
 import { loadMapLibre, buildStyle, whenLoaded, circlePolygon } from './map-core.js';
 import { createScene3D } from './scene3d.js';
+import { stopIcon } from './icons.js';
 
 const ANIM = { idle: 'CharacterArmature|Idle', walk: 'CharacterArmature|Walk', run: 'CharacterArmature|Run' };
 // Pokémon GO camera: low, tilted far enough to show the horizon, wide field of view, explorer dead centre.
@@ -187,7 +188,7 @@ export async function createWorld({ onStopTap, getCompass, onViewChange }) {
         const el = document.createElement('button');
         el.type = 'button'; el.className = 'beacon-label';
         el.innerHTML = '<span class="bl-icon"></span><span class="bl-name"></span>';
-        el.querySelector('.bl-icon').textContent = stop.icon;
+        el.querySelector('.bl-icon').innerHTML = stopIcon(stop);
         el.querySelector('.bl-name').textContent = stop.place;
         el.addEventListener('click', (e) => { e.stopPropagation(); onStopTap(stop.id); });
         labelsEl.append(el);
