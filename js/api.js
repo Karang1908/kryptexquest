@@ -108,7 +108,14 @@ export async function loadView() {
   if (!hasBackend) return demoView();
   const { data, error } = await (await supabase()).rpc('my_progress');
   if (error) throw error;
-  return data;
+  return withImageUrls(data);
+}
+
+/** Unlock-question images live in a public bucket (players are meant to see them); demo mode keeps data URLs. */
+export const entryImageUrl = (path) => (/^(data:|https?:)/.test(path) ? path : `${CONFIG.supabaseUrl}/storage/v1/object/public/question-images/${path}`);
+function withImageUrls(view) {
+  if (view?.stops) for (const stop of view.stops) if (stop.entryImages?.length) stop.entryImages = stop.entryImages.map(entryImageUrl);
+  return view;
 }
 
 /** A failure to reach the server at all (as opposed to the server saying no). */
@@ -118,7 +125,7 @@ async function rpc(name, args = {}) {
   const sb = await supabase();
   const { data, error } = await sb.rpc(name, args);
   if (error) return offlineish(error) ? { ok: false, offline: true, error: 'No connection.' } : { ok: false, error: error.message };
-  return { ...(data || { ok: true }), view: (await sb.rpc('my_progress')).data };
+  return { ...(data || { ok: true }), view: withImageUrls((await sb.rpc('my_progress')).data) };
 }
 const where = (pos) => ({ p_lat: pos?.lat ?? null, p_lng: pos?.lng ?? null, p_acc: pos?.accuracy ?? 0 });
 
@@ -420,6 +427,34 @@ export async function adminUploadRefs(stopId, idx, files) {
     results.push(true);
   }
   return { ok: true, count: results.length };
+}
+/** Images for a location's unlock question. `current` is the list already saved (paths, or data URLs in demo mode). */
+export async function adminAddEntryImages(stopId, current, files) {
+  const paths = [...current];
+  for (const file of files) {
+    if (paths.length >= 6) return { ok: false, error: 'Up to 6 images per unlock question.', paths };
+    if (!hasBackend) { paths.push(await blobToDataUrl(await compressImage(file, 800, 0.7))); continue; }
+    const path = `${stopId}/${crypto.randomUUID()}.jpg`;
+    const up = await (await supabase()).storage.from('question-images').upload(path, await compressImage(file, 1280, 0.82), { contentType: 'image/jpeg' });
+    if (up.error) return { ok: false, error: up.error.message, paths };
+    paths.push(path);
+  }
+  return { ...(await saveEntryImages(stopId, paths)), paths };
+}
+export async function adminRemoveEntryImage(stopId, current, index) {
+  const path = current[index];
+  const paths = current.filter((_, i) => i !== index);
+  const result = await saveEntryImages(stopId, paths);
+  if (result.ok && hasBackend) await (await supabase()).storage.from('question-images').remove([path]);
+  return { ...result, paths };
+}
+async function saveEntryImages(stopId, paths) {
+  if (hasBackend) return adminRpc('admin_set_entry_images', { p_stop: stopId, p_paths: paths });
+  const content = demoContent();
+  const stop = content.find((x) => x.id === stopId);
+  if (!stop) return { ok: false, error: 'Save the location first.' };
+  stop.entryImages = paths; demoContentSave(content);
+  return { ok: true };
 }
 export async function adminDeleteRef(stopId, idx, ref) {
   if (!hasBackend) {
