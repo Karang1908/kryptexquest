@@ -5,21 +5,21 @@ const STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
 
 // Night-time navy palette over OpenFreeMap's flat dark style (layer id -> [paint prop, colour]).
 const PALETTE = {
-  background: ['background-color', '#1b1146'],
-  water: ['fill-color', '#3a2a8a'],
-  landuse_residential: ['fill-color', '#221558'],
+  background: ['background-color', '#23212f'],
+  water: ['fill-color', '#494660'],
+  landuse_residential: ['fill-color', '#2b293b'],
   landcover_wood: ['fill-color', '#14403a'],
   landuse_park: ['fill-color', '#175a46'],
-  waterway: ['line-color', '#3a2a8a'],
-  highway_path: ['line-color', '#8a7acb'],
-  highway_minor: ['line-color', '#5d4aa8'],
+  waterway: ['line-color', '#494660'],
+  highway_path: ['line-color', '#9185c0'],
+  highway_minor: ['line-color', '#65579b'],
   highway_major_casing: ['line-color', '#fbbc05'],
-  highway_major_inner: ['line-color', '#4d3c96'],
-  highway_major_subtle: ['line-color', '#5d4aa8'],
+  highway_major_inner: ['line-color', '#58546d'],
+  highway_major_subtle: ['line-color', '#65579b'],
   highway_motorway_casing: ['line-color', '#fbbc05'],
-  highway_motorway_subtle: ['line-color', '#5d4aa8'],
-  highway_name_other: ['text-color', '#cbbef2'],
-  highway_name_motorway: ['text-color', '#cbbef2'],
+  highway_motorway_subtle: ['line-color', '#65579b'],
+  highway_name_other: ['text-color', '#cfc5eb'],
+  highway_name_motorway: ['text-color', '#cfc5eb'],
 };
 
 let libPromise;
@@ -35,7 +35,7 @@ export function loadMapLibre() {
 export async function buildStyle() {
   const style = await (await fetch(STYLE_URL)).json();
   style.sky = {
-    'sky-color': '#0e0828', 'horizon-color': '#9a7bf2', 'fog-color': '#2e1d6e',
+    'sky-color': '#13121a', 'horizon-color': '#4a4668', 'fog-color': '#38354b',
     'sky-horizon-blend': 0.55, 'horizon-fog-blend': 0.7, 'fog-ground-blend': 0.35, 'atmosphere-blend': 0,
   };
   const index = style.layers.findIndex((layer) => layer.id === 'building');
@@ -43,7 +43,7 @@ export async function buildStyle() {
     style.layers.splice(index, 1, {
       id: 'building-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 14,
       paint: {
-        'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 8], 0, '#3b2a7e', 30, '#4a3896', 90, '#5b49b0'],
+        'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 8], 0, '#454259', 30, '#55526c', 90, '#6457a2'],
         'fill-extrusion-height': ['*', 0.7, ['coalesce', ['get', 'render_height'], 8]],
         'fill-extrusion-base': ['*', 0.7, ['coalesce', ['get', 'render_min_height'], 0]],
         'fill-extrusion-opacity': 0.92,
