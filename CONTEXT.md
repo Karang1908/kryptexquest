@@ -23,7 +23,7 @@ Mobile-first, dark theme with Google blue/red/yellow/green accents. No build ste
 - `js/login-art.js`: canvas background for the sign-in screen (the theme art is generated in code; there are no image assets besides the two GLBs).
 - `supabase/migrations/0001_init.sql` (content tables, domain trigger) and `0002_teams_admin.sql` (teams, per-team progress, events log, live locations, admins, all RPCs; **0002 drops 0001's per-user progress tables**), `0003` (content admin + photos), `0004` (game flow v2: base, entry modes, event control, leaderboard, admin tools), `0005` (bonus as a question, finish = all codes handed in), `0007` (remote solving after unlock), `0006` (hidden locations, server-side discovery, entry flag typed at the location; replaces 0005's walk-in unlock). `supabase/seed.sql` holds the sample stops (generated from `js/data.js`). `supabase/functions/verify-photo/` is the photo edge function.
 
-## Game flow (decided by the organisers; migrations 0004-0008)
+## Game flow (decided by the organisers; migrations 0004-0010)
 
 **Locations are hidden.** The map shows only the base (red) until a team *discovers* a location by walking into its radius; the phone then says "📍 Location discovered" (every time a team finds one, even if it already has the hint). A discovered location stays on that team's map: **grey = discovered but locked, blue = unlocked and being solved, green = cleared**. The server does the discovering (the phone does not know where hidden locations are): every location ping (about every 4 s) is checked against the stops, and `my_progress()` omits the name, position and description of undiscovered locations.
 
@@ -54,11 +54,18 @@ Event tab: start / pause / end (plus optional scheduled start and hard end), bro
 - **Offline tolerance**: an OFFLINE badge appears when the phone cannot reach the server; flag answers typed meanwhile are stored on the phone and sent automatically on reconnect (positions, unlocks, hand-ins and photos are not queued: they need the player to be there right now).
 - **Team recap**: after the finish, "Our recap & share card" shows total time, rank among finished teams, time per location, wrong answers, fastest solve and per-player flags, and can save/share a PNG card drawn on a canvas.
 
+### Rules changed in the last round (migration 0010)
+- **Teams of 1 to 4**: solo play is allowed (`lock_team` needs 1 player).
+- **No bonus question**: the bonus role is no longer offered or shown; finishing = every code handed in, and a **Finished!** screen shows time, rank and flags (plus the recap card).
+- **The base shows one hint at a time**: only the next location's hint and entry question, then the locations the team has found, then the hand-in slot. Future locations are not listed.
+- **Location gems in the HUD**: one hex gem per location, tappable from anywhere once discovered (grey locked, purple open, green cleared).
+- **Players report** (console, Teams > Players): every player with questions solved, wrong guesses, unlocks and last seen; click a header or use the sort menu; CSV export. Backed by `admin_players()`.
+
 ### Console layout (revamp)
 Navbar: Live · Teams · Locations · Photos · Event, plus a status lamp for the event clock and sign-out. Activity log lives inside Teams (Teams | Activity). Live has the map with floating stats and a move bar for relocating a location (click a pin); Locations is a sectioned editor (Basics, Where, How teams find and unlock it, Questions; More options folded); Event folds Safety and Exports.
 
 ### Visual system
-"Cipher Plate" (see `DESIGN.md`): anodised black plates, recessed fields, key-style buttons, engraved caps labels, rotor-window numbers, the four Google colours as the only light, one drawn icon set (`js/icons.js`), GDG logos and Google Sans from `assets/`. Tokens in `theme.css`.
+"Night Quest" (see `DESIGN.md`): a chunky mobile-game UI in purple with white star dots; ink-outlined candy keys, studded panels, hex medals, ribbons, treasure chest rewards, Lilita One + Google Sans, game-icons.net glyphs, sounds, GDG logos. Tokens in `theme.css`; credits in `assets/CREDITS.md`.
 
 ### Indoor GPS
 At a stop, "in range" means within its radius plus the phone's own accuracy (capped at 25 m), **or** having scanned the stop's printed QR in the last 15 minutes. The QR encodes `<site>/?qr=<stop>.<token>`; scanning with the phone camera opens the game and calls `scan_qr`. Print them from Console -> Content.
