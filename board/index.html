@@ -4,32 +4,43 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#05070b" />
     <title>Kryptex Quest · Live</title>
-    <link rel="stylesheet" href="../styles.css" />
+    <link rel="icon" type="image/png" href="../assets/brand/favicon.png" />
+    <link rel="preload" href="../assets/fonts/GoogleSans.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../theme.css" />
     <style>
-      body { overflow: auto; background: radial-gradient(120% 80% at 50% 0%, #131b38 0%, var(--bg) 60%); min-height: 100vh; }
-      .wrap { max-width: 1200px; margin: 0 auto; padding: 4vh 4vw; display: grid; gap: 3vh; }
+      body { overflow: auto; min-height: 100vh; background: #150a36 url('../assets/art/keyart-night.svg') center bottom / cover fixed no-repeat; }
+      body::before { content: ''; position: fixed; inset: 0; background: rgba(14, 7, 38, 0.62); pointer-events: none; }
+      .wrap { position: relative; max-width: 1280px; margin: 0 auto; padding: 4vh 4vw 6vh; display: grid; gap: 3vh; }
       header { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-      header h1 { font-size: clamp(32px, 5vw, 64px); }
-      header h1 span { background: linear-gradient(90deg, var(--blue), var(--red) 40%, var(--yellow) 70%, var(--green)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-      #state { font: 700 clamp(18px, 2.4vw, 32px) 'Space Grotesk', sans-serif; padding: 10px 22px; border-radius: 999px; background: var(--surface-2); }
-      #state.running { color: #7fdc99; } #state.paused, #state.lobby { color: var(--yellow); } #state.ended { color: #ff9d94; }
-      .row { display: grid; grid-template-columns: 6vw 1fr 22vw; gap: 2vw; align-items: center; padding: 1.6vh 2vw; border-radius: 22px; background: rgba(18, 24, 41, 0.85); border: 1px solid var(--line); font-size: clamp(18px, 2.2vw, 34px); }
-      .row:nth-child(1) { border-color: var(--yellow); box-shadow: 0 0 40px -10px var(--yellow); }
-      .row .pos { font: 700 1.3em 'Space Grotesk', sans-serif; color: var(--muted); }
-      .row:nth-child(-n+3) .pos { color: var(--yellow); }
-      .row strong { display: block; }
-      .row small { color: var(--muted); font-size: 0.55em; }
-      .pips { display: flex; gap: 4px; margin-top: 8px; }
-      .pips i { flex: 1; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); }
-      .pips i.on { background: var(--green); } .pips i.hub { background: var(--yellow); }
-      .time { text-align: right; font: 700 1.1em 'Space Grotesk', sans-serif; }
-      #note { text-align: center; color: var(--muted); font-size: 22px; padding: 12vh 0; }
+      header img { height: clamp(40px, 6vw, 84px); width: auto; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.5)); }
+      #state { display: inline-flex; align-items: center; gap: 12px; font: 400 clamp(18px, 2.4vw, 34px) var(--font-display); letter-spacing: 0.05em; text-transform: uppercase; padding: 8px 26px; border-radius: 999px; border: 4px solid var(--ink); background: var(--recess); box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.6), 0 4px 0 var(--ink); color: var(--muted); }
+      #state::before { content: ''; width: 0.5em; height: 0.5em; border-radius: 50%; background: currentColor; border: 3px solid var(--ink); box-sizing: content-box; }
+      #state.running { color: var(--green-ink); } #state.paused, #state.lobby { color: var(--yellow-ink); } #state.ended { color: var(--red-ink); }
+      #state:empty { display: none; }
+      h1 { font-size: clamp(44px, 8vw, 110px); line-height: 0.95; color: #fff; -webkit-text-stroke: 8px var(--ink); paint-order: stroke fill; text-shadow: 0 6px 0 var(--ink); }
+      h1 span { color: var(--yellow-hi); }
+      #rows { display: grid; gap: 1.6vh; }
+      .row { position: relative; display: grid; grid-template-columns: 7vw 1fr 20vw; gap: 2vw; align-items: center; padding: 2vh 2.4vw; border-radius: 26px; border: 4px solid var(--ink); background: linear-gradient(180deg, #3d2d94, #291d6c); box-shadow: 0 6px 0 var(--ink), inset 0 4px 0 rgba(255, 255, 255, 0.16); font-size: clamp(16px, 2.4vw, 34px); }
+      .row:nth-child(1) { border-color: var(--yellow); }
+      .row .pos { display: grid; place-items: center; width: 1.9em; height: 1.9em; border-radius: 50%; border: 4px solid var(--ink); background: var(--locked-lo); font: 400 1em var(--font-display); font-variant-numeric: tabular-nums; }
+      .row:nth-child(1) .pos { background: linear-gradient(180deg, var(--yellow-hi), var(--yellow-lo)); color: #3a2200; }
+      .row:nth-child(2) .pos { background: linear-gradient(180deg, #e8ecff, #9aa5d6); color: #1b2140; }
+      .row:nth-child(3) .pos { background: linear-gradient(180deg, #f0a56a, #b5622a); color: #3a1c08; }
+      .row strong { display: block; font-family: var(--font-display); font-weight: 400; letter-spacing: 0.01em; }
+      .row small { display: block; color: var(--muted); font-size: 0.5em; margin-top: 0.2em; }
+      .pips { display: flex; gap: 6px; margin-top: 1.2vh; }
+      .pips i { flex: 1; height: 14px; border-radius: 7px; border: 3px solid var(--ink); background: var(--recess); box-sizing: border-box; }
+      .pips i.on { background: linear-gradient(180deg, var(--green-hi), var(--green-lo)); } .pips i.hub { background: linear-gradient(180deg, var(--yellow-hi), var(--yellow-lo)); }
+      .time { text-align: right; font: 400 1.15em var(--font-display); font-variant-numeric: tabular-nums; }
+      #note { text-align: center; color: #ebe4ff; font-size: 22px; padding: 12vh 0; text-shadow: 0 2px 0 #000; }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <header><h1>Kryptex <span>Quest</span> · Live</h1><div id="state"></div></header>
+      <header><img src="../assets/brand/gdg-logo-dark.png" alt="Google Developer Group, BITS Pilani Dubai Campus" /><div id="state"></div></header>
+      <h1>Kryptex <span>Quest</span></h1>
       <div id="rows"></div>
       <p id="note" hidden></p>
     </div>
