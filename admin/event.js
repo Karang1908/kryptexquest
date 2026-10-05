@@ -36,7 +36,7 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
   // ---------- pre-event checklist ----------
   const PRINTED_KEY = 'kq-admin-qr-printed';
   const printed = () => { try { return JSON.parse(localStorage.getItem(PRINTED_KEY) || '{}'); } catch { return {}; } };
-  const MIN_REFS = 5;
+  const MIN_REFS = 3; const GOOD_REFS = 8;
   /** Everything an organiser should be sure of before the doors open. level: bad (blocks play) | warn | ok */
   function checks(stops, game) {
     const out = [];
@@ -66,7 +66,7 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
         if (!String(p.prompt || '').trim()) add('bad', `${q}: no clue/prompt.`);
         if (p.kind === 'photo') {
           if (!String(p.question || '').trim()) add('bad', `${q}: photo question has no follow-up question text.`);
-          if ((p.refs || []).length < MIN_REFS) add((p.refs || []).length ? 'warn' : 'bad', `${q}: ${(p.refs || []).length} reference photos (aim for about 10; ${MIN_REFS}+ minimum).`);
+          if ((p.refs || []).length < GOOD_REFS) add((p.refs || []).length < MIN_REFS ? 'bad' : 'warn', `${q}: ${(p.refs || []).length} reference photos (${MIN_REFS} is the minimum, aim for about 10).`);
         }
         seen(p.flag, q);
       });
