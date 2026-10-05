@@ -100,8 +100,11 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
         <label class="field wide">Hint shown at the base once this location is released<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>
       </div></section>
       <section class="panel"><h3 class="sec">Unlock it: the question</h3><p class="hint">Shown at the base with the hint. The team opens the link, solves it, then types the flag when they are standing at the location. Leave the flag empty to unlock on discovery.</p><div class="form-grid">
-        <label class="field wide">Question title<textarea id="ed-eq" rows="2" placeholder="What is the name carved above the door?">${esc(stop.entryQuestion || '')}</textarea></label>
+        <label class="field wide">Question title (optional if you add images)<textarea id="ed-eq" rows="2" placeholder="What is the name carved above the door?">${esc(stop.entryQuestion || '')}</textarea></label>
         ${field('ed-eu', 'Question link (optional, https://...)', stop.entryUrl || '', 'wide')}
+        <div class="field wide"><span>Question images (optional, up to 6; shown to the team at the base)</span>
+          ${stop.isNew ? '<p class="hint">Create the location first, then add images.</p>' : `<div class="refs">${(stop.entryImages || []).map((path, i) => `<div class="ref"><img src="${esc(api.entryImageUrl(path))}" alt="Unlock question image" loading="lazy" /><button type="button" data-del-eimg="${i}" aria-label="Remove image">${icon('x')}</button></div>`).join('')}</div>
+          <label class="ref-add">${icon('plus')} Upload images<input type="file" accept="image/*" multiple data-eimg /></label>`}</div>
         ${field('ed-ea', 'Flag that unlocks it', stop.entryAnswer || '', 'wide')}
       </div></section>
       <section class="panel"><h3 class="sec">Clear it: the handoff</h3><div class="form-grid">
@@ -236,6 +239,11 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
       const result = await api.adminDeleteQuestion(stop.id, Number(delQ.dataset.delQ));
       return result.ok ? changed('Question deleted.') : toast(result.error);
     }
+    const delImg = t.closest('[data-del-eimg]');
+    if (delImg) {
+      const result = await api.adminRemoveEntryImage(stop.id, stop.entryImages || [], Number(delImg.dataset.delEimg));
+      return result.ok ? changed('Image removed.') : toast(result.error);
+    }
     const delRef = t.closest('[data-del-ref]');
     if (delRef) {
       const [idx, id] = delRef.dataset.delRef.split(':');
@@ -266,6 +274,14 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
         toast('Type changed. Fill the new fields and press Save question.');
       }
       return;
+    }
+    if (t.dataset.eimg !== undefined) {
+      const stop = current();
+      const files = [...t.files];
+      if (!files.length) return;
+      toast(`Uploading ${files.length} image${files.length === 1 ? '' : 's'}…`);
+      const result = await api.adminAddEntryImages(stop.id, stop.entryImages || [], files);
+      return result.ok ? changed('Images added.') : toast(result.error);
     }
     if (t.dataset.upload !== undefined) {
       const stop = current();
