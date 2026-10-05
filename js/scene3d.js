@@ -6,7 +6,7 @@
 
 const EXAGGERATION = 4.2;         // a little bigger than life so he reads on a phone, but still smaller than a building
 const REAL_HEIGHT_M = 1.75;
-const STATUS_COLOR = { locked: 0x6b7390, open: 0x4285f4, near: 0xfbbc05, cleared: 0x34a853, hub: 0xea4335 };
+const STATUS_COLOR = { locked: 0x8a86b8, open: 0x9a7bf2, near: 0xfbbc05, cleared: 0x34a853, hub: 0xea4335 };
 const BEAM_HEIGHT = 90;
 const CUBE_HEIGHT = 14;
 
@@ -28,7 +28,7 @@ export async function createScene3D(maplibregl) {
 
   const camera = new THREE.Camera();
   const scene = new THREE.Scene();
-  const hemi = new THREE.HemisphereLight(0xf0f5ff, 0x4a5a9a, 2.1);
+  const hemi = new THREE.HemisphereLight(0xf0f5ff, 0x5a4a9a, 2.1);
   const sun = new THREE.DirectionalLight(0xfff1dd, 2.6);
   scene.add(hemi, sun);
 
@@ -38,9 +38,9 @@ export async function createScene3D(maplibregl) {
   // ----- explorer -----
   const avatarRoot = new THREE.Group();
   world.add(avatarRoot);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.12, 64), new THREE.MeshBasicMaterial({ color: 0x4285f4, transparent: true, opacity: 0.9, depthWrite: false }));
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.12, 64), new THREE.MeshBasicMaterial({ color: 0x9a7bf2, transparent: true, opacity: 0.9, depthWrite: false }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05;
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(1.0, 64), new THREE.MeshBasicMaterial({ color: 0x4285f4, transparent: true, opacity: 0.16, depthWrite: false }));
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1.0, 64), new THREE.MeshBasicMaterial({ color: 0x9a7bf2, transparent: true, opacity: 0.16, depthWrite: false }));
   disc.rotation.x = -Math.PI / 2; disc.position.y = 0.04;
   const ringGroup = new THREE.Group();
   ringGroup.add(ring, disc);
@@ -106,8 +106,8 @@ export async function createScene3D(maplibregl) {
     const color = new THREE.Color(STATUS_COLOR.open);
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, BEAM_HEIGHT, 16, 1, true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, alphaMap: beamAlpha, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     beam.position.y = BEAM_HEIGHT / 2;
-    const cube = new THREE.Mesh(new THREE.BoxGeometry(4.5, 4.5, 4.5), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.9, roughness: 0.35, metalness: 0.1 }));
-    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(cube.geometry), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
+    const cube = new THREE.Mesh(new THREE.OctahedronGeometry(3.3), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.95, roughness: 0.25, metalness: 0.15, flatShading: true }));
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(cube.geometry), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
     cube.add(edges);
     const zone = new THREE.Mesh(new THREE.CircleGeometry(stop.radius || 50, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.045, depthWrite: false }));
     zone.rotation.x = -Math.PI / 2; zone.position.y = 0.03;
@@ -181,9 +181,10 @@ export async function createScene3D(maplibregl) {
         bk.group.position.set(east, 0, -north);
         bk.cube.position.y = CUBE_HEIGHT + Math.sin(t * 1.6 + bk.phase) * 1.2;
         bk.cube.rotation.y = t * 0.9 + bk.phase;
-        bk.cube.rotation.x = 0.35;
+        bk.cube.rotation.x = 0;
         const sel = state.selected === bk.stop.id;
-        bk.cube.scale.setScalar(sel ? 1.25 : 1);
+        const grow = sel ? 1.25 : 1;
+        bk.cube.scale.set(grow, grow * 1.55, grow);   // a tall faceted crystal
         bk.base.scale.setScalar(1 + Math.sin(t * 2 + bk.phase) * 0.06);
         bk.beam.visible = bk.status !== 'cleared';
         // Fade a beacon out as the explorer walks into it, so the pillar and cube never hide the character.
