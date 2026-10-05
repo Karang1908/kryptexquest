@@ -12,23 +12,23 @@
 
 :root {
   /* night */
-  --ink: #0f0728;                 /* the outline colour of everything */
-  --bg: #150a36;
-  --surface: #2c2074;             /* panel */
-  --surface-2: #3a2c8c;           /* raised row */
-  --surface-3: #4a3aa6;           /* hover / pressed */
-  --recess: #0f0828;              /* inset field */
+  --ink: #12111a;                 /* the outline colour of everything */
+  --bg: #191724;
+  --surface: #292637;             /* panel */
+  --surface-2: #353247;           /* raised row */
+  --surface-3: #443f5a;           /* hover / pressed */
+  --recess: #13121a;              /* inset field */
   --line: rgba(255, 255, 255, 0.12);
   --line-2: rgba(255, 255, 255, 0.24);
-  --text: #f7f3ff;
-  --muted: #c8bdf0;
+  --text: #f8f5fd;
+  --muted: #ccc4e9;
   /* the four candies: hi / base / lo / lip */
-  --blue: #8b6cf0; --blue-hi: #b8a2ff; --blue-lo: #6d48d9; --blue-lip: #3b2491;
+  --blue: #957ede; --blue-hi: #bfaff2; --blue-lo: #775cc5; --blue-lip: #484462;
   --red: #e8574c; --red-hi: #f7a097; --red-lo: #c4403a; --red-lip: #7a1f1b;
   --yellow: #f5c046; --yellow-hi: #ffe28f; --yellow-lo: #e5a323; --yellow-lip: #94601a;
   --green: #4fba74; --green-hi: #8fdcaa; --green-lo: #2f9459; --green-lip: #17583a;
-  --blue-ink: #d0c2ff; --red-ink: #ffaaa2; --yellow-ink: #ffe28f; --green-ink: #9fe6b6;
-  --locked: #a39fcc; --locked-hi: #c2bfe6; --locked-lo: #6f6a9c; --locked-lip: #333a66;
+  --blue-ink: #d5cbf6; --red-ink: #ffaaa2; --yellow-ink: #ffe28f; --green-ink: #9fe6b6;
+  --locked: #a8a5c6; --locked-hi: #c7c4e1; --locked-lo: #757195; --locked-lip: #333a66;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --font-display: 'Lilita One', 'Google Sans', system-ui, sans-serif;
@@ -73,7 +73,7 @@ select { appearance: none; -webkit-appearance: none; padding-right: 34px !import
 /* PANEL: the studded night-blue slab everything sits on. */
 .panel-game, .panel {
   position: relative; border-radius: 22px; border: 3px solid var(--ink);
-  background: var(--stars), linear-gradient(180deg, #3d2d94 0%, #291d6c 100%);
+  background: var(--stars), linear-gradient(180deg, #2f2c3f 0%, #211f2e 100%);
   box-shadow: var(--panel-shadow), inset 0 3px 0 rgba(255, 255, 255, 0.16), inset 0 -3px 0 rgba(0, 0, 0, 0.18);
 }
 /* RECESS: the dark inset slot for fields and readouts. */
@@ -98,7 +98,7 @@ select { appearance: none; -webkit-appearance: none; padding-right: 34px !import
 /* a shine that sweeps across the primary action */
 .primary-button::after { content: ''; position: absolute; inset: 0; border-radius: 13px; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.35) 48%, transparent 60%); background-size: 260% 100%; background-position: 140% 0; animation: shine 3.2s ease-in-out infinite; pointer-events: none; }
 @keyframes shine { 0%, 55% { background-position: 140% 0; } 100% { background-position: -40% 0; } }
-.ghost-button, .key, .btn:not(.save):not(.danger):not(.on), .icon-key { --k-hi: #6a54c8; --k-lo: #4a3aa6; --k-lip: #2a1d70; }
+.ghost-button, .key, .btn:not(.save):not(.danger):not(.on), .icon-key { --k-hi: #7464b8; --k-lo: #443f5a; --k-lip: #39354c; }
 .small-action { --k-hi: var(--green-hi); --k-lo: var(--green-lo); --k-lip: var(--green-lip); min-height: 48px; padding: 0 20px; }
 .btn.save { --k-hi: var(--blue-hi); --k-lo: var(--blue-lo); --k-lip: var(--blue-lip); }
 .btn.danger, .key.danger { --k-hi: var(--red-hi); --k-lo: var(--red-lo); --k-lip: var(--red-lip); }
@@ -112,7 +112,7 @@ select { appearance: none; -webkit-appearance: none; padding-right: 34px !import
 /* FIELDS */
 .field-input, .team-input, .flag-input { width: 100%; min-height: 52px; padding: 12px 16px; border-radius: 14px; border: 3px solid var(--ink); background: var(--recess); box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.6), 0 2px 0 rgba(255, 255, 255, 0.12); color: var(--text); font-size: 17px; font-weight: 500; transition: border-color 0.12s, box-shadow 0.12s; }
 .field-input:focus, .team-input:focus, .flag-input:focus { outline: none; border-color: var(--yellow); box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(251, 188, 4, 0.35); }
-::placeholder { color: #8a7ac8; }
+::placeholder { color: #9085bd; }
 
 /* MEDAL: a hex badge. State comes from --m-hi/--m-lo (default blue). Put a .gi or .i inside. */
 .medal { --m-hi: var(--blue-hi); --m-lo: var(--blue-lo); --s: 52px; position: relative; display: inline-grid; place-items: center; flex: none; width: var(--s); height: calc(var(--s) * 1.1); filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)); color: #fff; }
