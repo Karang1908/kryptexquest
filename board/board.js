@@ -22,9 +22,9 @@ async function tick() {
   note.textContent = 'Waiting for teams to lock in…';
   const needed = board.stops || 4;
   $('#rows').innerHTML = board.rows.slice(0, 12).map((r) => `<div class="row"><span class="pos">${r.rank}</span>
-    <span><strong>${esc(r.name)}</strong><small>${r.stopsCleared} of ${needed} locations · ${r.hubFlags} flags handed in · ${r.players} players</small>
+    <span><strong>${esc(r.name)}</strong><small>${r.stopsCleared}/${needed} locations · ${r.hubFlags} handed in · ${r.players} player${r.players === 1 ? '' : 's'}</small>
       <div class="pips">${Array.from({ length: needed }, (_, i) => `<i class="${i < r.stopsCleared ? 'on' : i < r.hubFlags ? 'hub' : ''}"></i>`).join('')}</div></span>
-    <span class="time">${r.finishedAt ? `🏁 ${clock(r.elapsedSeconds)}` : r.startedAt ? `${r.flags} flags` : 'on the way'}</span></div>`).join('');
+    <span class="time">${r.finishedAt ? clock(r.elapsedSeconds) : r.startedAt ? `${r.flags} flags` : 'on the way'}</span></div>`).join('');
 }
 
 tick();
