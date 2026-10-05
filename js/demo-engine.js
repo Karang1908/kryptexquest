@@ -74,15 +74,17 @@ export function buildView({ content, state, game, announcements = [], team, now 
       id: s.id, ord: s.ord, role: s.role, entryMode: s.entryMode, discovered: d, released: r, needsFlag: Boolean(s.entryAnswer),
       name: hide(s.name), place: hide(s.place), label: hide(s.label), type: hide(s.type), icon: hide(s.icon), lat: hide(s.lat), lng: hide(s.lng), radius: hide(s.radius),
       description: hide(s.description),
-      hint: r ? s.hint || '' : null, entryQuestion: r ? s.entryQuestion || null : null, entryUrl: r ? s.entryUrl || null : null, entryFlag: r && !s.entryQuestion ? s.entryAnswer || null : null,
+      hint: r ? s.hint || '' : null, entryQuestion: r ? s.entryQuestion || null : null, entryUrl: r ? s.entryUrl || null : null, entryImages: r ? (s.entryImages || []).map((i) => i.path ?? i) : [], entryFlag: r && !s.entryQuestion ? s.entryAnswer || null : null,
       prevOrd: prevStop(content, s)?.ord ?? null,
       state: cleared ? 'cleared' : open ? 'open' : 'locked', puzzleCount: s.puzzles.length,
       exitFlag: cleared ? s.exitFlag : null, nextClue: cleared ? s.nextClue : null,
       puzzles: open ? s.puzzles.map((p, idx) => {
         const photoCleared = p.kind === 'photo' && state.photoCleared.includes(sid(s.id, idx));
         const solved = state.solved[sid(s.id, idx)];
+        const locked = questionLocked(state, s, idx);
         return {
-          idx, title: p.title, kind: p.kind, prompt: p.prompt, questionUrl: p.kind === 'flag' || photoCleared ? p.questionUrl || null : null, photoCleared,
+          idx, kind: p.kind, locked, title: locked ? null : p.title, prompt: locked ? null : p.prompt,
+          questionUrl: !locked && (p.kind === 'flag' || photoCleared) ? p.questionUrl || null : null, photoCleared,
           pending: state.pending.includes(sid(s.id, idx)), solved: Boolean(solved), solvedBy: solved?.by ?? null,
         };
       }) : [],
@@ -160,12 +162,18 @@ export function hubFlag(ctx, flag) {
   return { ok: true, place: stop.place, have: ctx.state.hubFlags.length, need };
 }
 
+/** Questions inside a location are answered in order: question N opens once 0..N-1 are solved. */
+function questionLocked(state, stop, idx) {
+  return stop.puzzles.some((_, i) => i < idx && !state.solved[sid(stop.id, i)]);
+}
+
 export function submitFlag(ctx, stopId, idx, flag) {
   const err = guard(ctx); if (err) return fail(err);
   const stop = byId(ctx.content, stopId);
   const puzzle = stop?.puzzles[idx];
   if (!stop || !puzzle || stop.role === 'hub') return fail('Unknown question.');
   if (!stopOpen(ctx.content, ctx.state, stopId)) return fail('Unlock this location first.');
+  if (questionLocked(ctx.state, stop, idx)) return fail('Solve the earlier questions first.');
   if (puzzle.kind === 'photo' && !ctx.state.photoCleared.includes(sid(stopId, idx))) return fail('Photograph the object first. The question appears after the photo.');
   if (norm(flag) !== norm(puzzle.flag)) { ((ctx.state.wrong ||= {})[stopId] ||= 0); ctx.state.wrong[stopId]++; return fail('That flag is not quite right. Check the clue and try again.'); }
   ctx.state.solved[sid(stopId, idx)] = { by: ctx.me, at: ctx.now };
@@ -179,6 +187,7 @@ export function photoClear(ctx, stopId, idx) {
   const stop = byId(ctx.content, stopId);
   if (!stop?.puzzles[idx] || stop.puzzles[idx].kind !== 'photo') return fail('Unknown photo question.');
   if (!stopOpen(ctx.content, ctx.state, stopId)) return fail('Unlock this location first.');
+  if (questionLocked(ctx.state, stop, idx)) return fail('Solve the earlier questions first.');
   const key = sid(stopId, idx);
   if (!ctx.state.photoCleared.includes(key)) ctx.state.photoCleared.push(key);
   return { ok: true, cleared: true, simulated: true };
