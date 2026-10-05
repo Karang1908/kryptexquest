@@ -1,0 +1,211 @@
+/*
+ * NIGHT QUEST: the Kryptex Quest design system.
+ * A chunky mobile-adventure game UI: outlined candy buttons that press down, studded night-blue panels, hex medals,
+ * ribbons, gems and treasure. The four Google colours are the four candies. Shared by the game, the console and the board.
+ */
+
+@font-face { font-family: 'Lilita One'; src: url('./assets/fonts/LilitaOne.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Google Sans'; src: url('./assets/fonts/GoogleSans.woff2') format('woff2'); font-weight: 400 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Google Sans Text'; src: url('./assets/fonts/GoogleSansText-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Google Sans Text'; src: url('./assets/fonts/GoogleSansText-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Google Sans Text'; src: url('./assets/fonts/GoogleSansText-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+:root {
+  /* night */
+  --ink: #0f0728;                 /* the outline colour of everything */
+  --bg: #150a36;
+  --surface: #2c2074;             /* panel */
+  --surface-2: #3a2c8c;           /* raised row */
+  --surface-3: #4a3aa6;           /* hover / pressed */
+  --recess: #0f0828;              /* inset field */
+  --line: rgba(255, 255, 255, 0.12);
+  --line-2: rgba(255, 255, 255, 0.24);
+  --text: #f7f3ff;
+  --muted: #c8bdf0;
+  /* the four candies: hi / base / lo / lip */
+  --blue: #8b6cf0; --blue-hi: #b8a2ff; --blue-lo: #6d48d9; --blue-lip: #3b2491;
+  --red: #e8574c; --red-hi: #f7a097; --red-lo: #c4403a; --red-lip: #7a1f1b;
+  --yellow: #f5c046; --yellow-hi: #ffe28f; --yellow-lo: #e5a323; --yellow-lip: #94601a;
+  --green: #4fba74; --green-hi: #8fdcaa; --green-lo: #2f9459; --green-lip: #17583a;
+  --blue-ink: #d0c2ff; --red-ink: #ffaaa2; --yellow-ink: #ffe28f; --green-ink: #9fe6b6;
+  --locked: #a39fcc; --locked-hi: #c2bfe6; --locked-lo: #6f6a9c; --locked-lip: #333a66;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --font-display: 'Lilita One', 'Google Sans', system-ui, sans-serif;
+  --font-body: 'Google Sans Text', 'Google Sans', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --key-shadow: 0 4px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.3);
+  --recess-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.6);
+  --plate-shadow: var(--panel-shadow);
+  --stars: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cg fill='%23fff'%3E%3Ccircle cx='12' cy='20' r='1.1' opacity='.55'/%3E%3Ccircle cx='58' cy='9' r='.7' opacity='.4'/%3E%3Ccircle cx='101' cy='34' r='1.3' opacity='.6'/%3E%3Ccircle cx='143' cy='17' r='.8' opacity='.45'/%3E%3Ccircle cx='30' cy='71' r='.8' opacity='.4'/%3E%3Ccircle cx='84' cy='88' r='1' opacity='.5'/%3E%3Ccircle cx='128' cy='76' r='.7' opacity='.35'/%3E%3Ccircle cx='17' cy='128' r='1.2' opacity='.55'/%3E%3Ccircle cx='66' cy='141' r='.7' opacity='.4'/%3E%3Ccircle cx='112' cy='123' r='1.1' opacity='.5'/%3E%3Ccircle cx='148' cy='146' r='.8' opacity='.4'/%3E%3C/g%3E%3C/svg%3E");
+  --panel-shadow: 0 5px 0 var(--ink), 0 14px 24px -8px rgba(0, 0, 0, 0.6);
+  font-family: var(--font-body);
+  color: var(--text);
+  background: var(--bg);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; background: var(--bg); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; touch-action: manipulation; }
+button:disabled { cursor: not-allowed; }
+[hidden] { display: none !important; }
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 400; margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+a { color: var(--blue-ink); }
+::selection { background: rgba(139, 108, 240, 0.5); }
+:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+select { appearance: none; -webkit-appearance: none; padding-right: 34px !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1.5 1.5l5.5 5.5 5.5-5.5' fill='none' stroke='%23aab5e6' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+
+/* drawn UI glyphs (js/icons.js) and game icons (CC BY 3.0, game-icons.net, see assets/CREDITS.md) */
+.i { width: 1.25em; height: 1.25em; flex: none; vertical-align: -0.22em; }
+.gi { display: inline-block; flex: none; width: 1.3em; height: 1.3em; vertical-align: -0.28em; background: currentColor; -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; }
+
+.display { font-family: var(--font-display); }
+/* Lettering with a chunky outline, the way game titles are set. */
+.outlined { font-family: var(--font-display); color: #fff; -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; text-shadow: 0 4px 0 var(--ink); }
+.engrave { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.digits { font-family: var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.code { font-family: var(--font-mono); letter-spacing: 0.06em; }
+
+/* PANEL: the studded night-blue slab everything sits on. */
+.panel-game, .panel {
+  position: relative; border-radius: 22px; border: 3px solid var(--ink);
+  background: var(--stars), linear-gradient(180deg, #3d2d94 0%, #291d6c 100%);
+  box-shadow: var(--panel-shadow), inset 0 3px 0 rgba(255, 255, 255, 0.16), inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+}
+/* RECESS: the dark inset slot for fields and readouts. */
+.recess { background: var(--recess); border: 3px solid var(--ink); border-radius: 14px; box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.6), 0 2px 0 rgba(255, 255, 255, 0.1); }
+
+/* KEYS: outlined candy buttons with a lip; they press down. Colour comes from --k-hi/--k-lo/--k-lip. */
+.primary-button, .ghost-button, .small-action, .btn, .google-button, .key, .icon-key {
+  --k-hi: var(--blue-hi); --k-lo: var(--blue-lo); --k-lip: var(--blue-lip); --k-text: #fff;
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 52px; padding: 0 22px; border-radius: 16px; border: 3px solid var(--ink);
+  background: linear-gradient(180deg, var(--k-hi) 0%, var(--k-lo) 100%);
+  color: var(--k-text); font-family: var(--font-display); font-size: 19px; letter-spacing: 0.02em; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: 0 5px 0 var(--k-lip), 0 5px 0 3px var(--ink), 0 12px 14px -4px rgba(0, 0, 0, 0.55), inset 0 3px 0 rgba(255, 255, 255, 0.5), inset 0 -3px 0 rgba(0, 0, 0, 0.12);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s;
+  transform: translateY(0);
+}
+.primary-button { width: 100%; }
+.primary-button:hover:not(:disabled), .small-action:hover:not(:disabled), .btn:hover:not(:disabled), .key:hover:not(:disabled), .ghost-button:hover:not(:disabled) { filter: brightness(1.08); }
+.primary-button:active:not(:disabled), .ghost-button:active:not(:disabled), .small-action:active:not(:disabled), .btn:active:not(:disabled), .google-button:active, .key:active:not(:disabled), .icon-key:active:not(:disabled) {
+  transform: translateY(5px); box-shadow: 0 0 0 var(--k-lip), 0 0 0 3px var(--ink), 0 4px 6px -2px rgba(0, 0, 0, 0.5), inset 0 3px 0 rgba(255, 255, 255, 0.4);
+}
+/* a shine that sweeps across the primary action */
+.primary-button::after { content: ''; position: absolute; inset: 0; border-radius: 13px; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.35) 48%, transparent 60%); background-size: 260% 100%; background-position: 140% 0; animation: shine 3.2s ease-in-out infinite; pointer-events: none; }
+@keyframes shine { 0%, 55% { background-position: 140% 0; } 100% { background-position: -40% 0; } }
+.ghost-button, .key, .btn:not(.save):not(.danger):not(.on), .icon-key { --k-hi: #6a54c8; --k-lo: #4a3aa6; --k-lip: #2a1d70; }
+.small-action { --k-hi: var(--green-hi); --k-lo: var(--green-lo); --k-lip: var(--green-lip); min-height: 48px; padding: 0 20px; }
+.btn.save { --k-hi: var(--blue-hi); --k-lo: var(--blue-lo); --k-lip: var(--blue-lip); }
+.btn.danger, .key.danger { --k-hi: var(--red-hi); --k-lo: var(--red-lo); --k-lip: var(--red-lip); }
+.btn.on, .key.yellow { --k-hi: var(--yellow-hi); --k-lo: var(--yellow-lo); --k-lip: var(--yellow-lip); --k-text: #3a2200; text-shadow: 0 2px 0 rgba(255, 255, 255, 0.4); }
+.google-button { --k-hi: #ffffff; --k-lo: #dfe6f7; --k-lip: #8f9bc4; --k-text: #1b2140; text-shadow: none; width: 100%; }
+.primary-button:disabled, .small-action:disabled, .btn:disabled, .key:disabled { filter: grayscale(1) brightness(0.8); box-shadow: 0 5px 0 #2a2f55, 0 5px 0 3px var(--ink), inset 0 3px 0 rgba(255, 255, 255, 0.2); }
+.btn { min-height: 40px; padding: 0 14px; font-size: 15px; border-radius: 12px; border-width: 3px; box-shadow: 0 4px 0 var(--k-lip), 0 4px 0 3px var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.45); }
+.btn:active:not(:disabled) { transform: translateY(4px); }
+.icon-key { min-width: 44px; min-height: 44px; padding: 0 10px; font-size: 16px; border-radius: 14px; }
+
+/* FIELDS */
+.field-input, .team-input, .flag-input { width: 100%; min-height: 52px; padding: 12px 16px; border-radius: 14px; border: 3px solid var(--ink); background: var(--recess); box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.6), 0 2px 0 rgba(255, 255, 255, 0.12); color: var(--text); font-size: 17px; font-weight: 500; transition: border-color 0.12s, box-shadow 0.12s; }
+.field-input:focus, .team-input:focus, .flag-input:focus { outline: none; border-color: var(--yellow); box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(251, 188, 4, 0.35); }
+::placeholder { color: #8a7ac8; }
+
+/* MEDAL: a hex badge. State comes from --m-hi/--m-lo (default blue). Put a .gi or .i inside. */
+.medal { --m-hi: var(--blue-hi); --m-lo: var(--blue-lo); --s: 52px; position: relative; display: inline-grid; place-items: center; flex: none; width: var(--s); height: calc(var(--s) * 1.1); filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)); color: #fff; }
+.medal::before, .medal::after { content: ''; position: absolute; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.medal::before { inset: 0; background: var(--ink); }
+.medal::after { inset: 3px; background: linear-gradient(180deg, var(--m-hi) 0%, var(--m-lo) 100%); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5); }
+.medal > * { position: relative; z-index: 1; width: 50%; height: 50%; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35)); }
+.medal.blue { --m-hi: var(--blue-hi); --m-lo: var(--blue-lo); }
+.medal.green { --m-hi: var(--green-hi); --m-lo: var(--green-lo); }
+.medal.red { --m-hi: var(--red-hi); --m-lo: var(--red-lo); }
+.medal.yellow { --m-hi: var(--yellow-hi); --m-lo: var(--yellow-lo); color: #3a2200; }
+.medal.grey { --m-hi: var(--locked-hi); --m-lo: var(--locked-lo); }
+
+/* RIBBON: a banner for headings, with folded tails. */
+.ribbon { --r: var(--blue-lo); --r-hi: var(--blue-hi); position: relative; display: inline-block; padding: 8px 30px 10px; font-family: var(--font-display); font-size: 22px; letter-spacing: 0.03em; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); background: linear-gradient(180deg, var(--r-hi), var(--r)); border: 3px solid var(--ink); border-radius: 6px; box-shadow: 0 4px 0 var(--ink), inset 0 3px 0 rgba(255, 255, 255, 0.4); }
+.ribbon::before, .ribbon::after { content: ''; position: absolute; top: 10px; width: 26px; height: 100%; background: var(--r); border: 3px solid var(--ink); z-index: -1; }
+.ribbon::before { left: -20px; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 28% 50%); }
+.ribbon::after { right: -20px; clip-path: polygon(0 0, 100% 0, 72% 50%, 100% 100%, 0 100%); }
+.ribbon.red { --r: var(--red-lo); --r-hi: var(--red-hi); }
+.ribbon.green { --r: var(--green-lo); --r-hi: var(--green-hi); }
+.ribbon.yellow { --r: var(--yellow-lo); --r-hi: var(--yellow-hi); color: #3a2200; text-shadow: 0 2px 0 rgba(255, 255, 255, 0.4); }
+
+/* PILL: small status tag */
+.pill-tag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 999px; border: 2px solid var(--ink); background: var(--surface-3); font-family: var(--font-display); font-size: 13px; letter-spacing: 0.04em; color: var(--text); box-shadow: 0 2px 0 var(--ink); }
+.pill-tag.blue { background: var(--blue-lo); } .pill-tag.green { background: var(--green-lo); } .pill-tag.red { background: var(--red-lo); } .pill-tag.yellow { background: var(--yellow); color: #3a2200; } .pill-tag.grey { background: var(--locked-lo); }
+
+/* BAR: a chunky progress bar */
+.bar { height: 22px; border-radius: 999px; border: 3px solid var(--ink); background: var(--recess); box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.6); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(180deg, var(--green-hi), var(--green-lo)); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45); }
+
+/* GAME JUICE */
+@keyframes pop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.pop { animation: pop 0.45s var(--pop) both; }
+.shake { animation: shake 0.35s linear; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* ---- game-icons registry ---- */
+.gi-bookshelf { --src: url('./assets/icons/bookshelf.svg'); }
+.gi-camping-tent { --src: url('./assets/icons/camping-tent.svg'); }
+.gi-castle { --src: url('./assets/icons/castle.svg'); }
+.gi-checked-shield { --src: url('./assets/icons/checked-shield.svg'); }
+.gi-checkered-flag { --src: url('./assets/icons/checkered-flag.svg'); }
+.gi-chest { --src: url('./assets/icons/chest.svg'); }
+.gi-compass { --src: url('./assets/icons/compass.svg'); }
+.gi-crown { --src: url('./assets/icons/crown.svg'); }
+.gi-crystal-ball { --src: url('./assets/icons/crystal-ball.svg'); }
+.gi-crystal-shine { --src: url('./assets/icons/crystal-shine.svg'); }
+.gi-doorway { --src: url('./assets/icons/doorway.svg'); }
+.gi-erlenmeyer { --src: url('./assets/icons/erlenmeyer.svg'); }
+.gi-exit-door { --src: url('./assets/icons/exit-door.svg'); }
+.gi-eye { --src: url('./assets/icons/eye.svg'); }
+.gi-flag-objective { --src: url('./assets/icons/flag-objective.svg'); }
+.gi-footsteps { --src: url('./assets/icons/footsteps.svg'); }
+.gi-gems { --src: url('./assets/icons/gems.svg'); }
+.gi-ghost { --src: url('./assets/icons/ghost.svg'); }
+.gi-hourglass { --src: url('./assets/icons/hourglass.svg'); }
+.gi-key { --src: url('./assets/icons/key.svg'); }
+.gi-lantern { --src: url('./assets/icons/lantern.svg'); }
+.gi-laurels-trophy { --src: url('./assets/icons/laurels-trophy.svg'); }
+.gi-level-end-flag { --src: url('./assets/icons/level-end-flag.svg'); }
+.gi-locked-chest { --src: url('./assets/icons/locked-chest.svg'); }
+.gi-magnifying-glass { --src: url('./assets/icons/magnifying-glass.svg'); }
+.gi-medal { --src: url('./assets/icons/medal.svg'); }
+.gi-oak { --src: url('./assets/icons/oak.svg'); }
+.gi-open-treasure-chest { --src: url('./assets/icons/open-treasure-chest.svg'); }
+.gi-padlock { --src: url('./assets/icons/padlock.svg'); }
+.gi-padlock-open { --src: url('./assets/icons/padlock-open.svg'); }
+.gi-photo-camera { --src: url('./assets/icons/photo-camera.svg'); }
+.gi-pirate-flag { --src: url('./assets/icons/pirate-flag.svg'); }
+.gi-portal { --src: url('./assets/icons/portal.svg'); }
+.gi-position-marker { --src: url('./assets/icons/position-marker.svg'); }
+.gi-question { --src: url('./assets/icons/question.svg'); }
+.gi-radar-sweep { --src: url('./assets/icons/radar-sweep.svg'); }
+.gi-ribbon-medal { --src: url('./assets/icons/ribbon-medal.svg'); }
+.gi-ringing-bell { --src: url('./assets/icons/ringing-bell.svg'); }
+.gi-rune-stone { --src: url('./assets/icons/rune-stone.svg'); }
+.gi-scroll-unfurled { --src: url('./assets/icons/scroll-unfurled.svg'); }
+.gi-secret-door { --src: url('./assets/icons/secret-door.svg'); }
+.gi-skeleton-key { --src: url('./assets/icons/skeleton-key.svg'); }
+.gi-smartphone { --src: url('./assets/icons/smartphone.svg'); }
+.gi-sparkles { --src: url('./assets/icons/sparkles.svg'); }
+.gi-spyglass { --src: url('./assets/icons/spyglass.svg'); }
+.gi-star-medal { --src: url('./assets/icons/star-medal.svg'); }
+.gi-ticket { --src: url('./assets/icons/ticket.svg'); }
+.gi-torch { --src: url('./assets/icons/torch.svg'); }
+.gi-tower-flag { --src: url('./assets/icons/tower-flag.svg'); }
+.gi-treasure-map { --src: url('./assets/icons/treasure-map.svg'); }
+.gi-trophy { --src: url('./assets/icons/trophy.svg'); }
+.gi-vending-machine { --src: url('./assets/icons/vending-machine.svg'); }
+.gi-walking-boot { --src: url('./assets/icons/walking-boot.svg'); }
