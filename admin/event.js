@@ -1,5 +1,6 @@
 // The "Event" tab: start / pause / end, broadcast, quest area + no-go zones, help requests, standings, exports, data purge.
 import * as api from '../js/api.js';
+import { icon } from '../js/icons.js';
 import { DEMO_STOPS } from '../js/data.js';
 import { distanceM } from '../js/geo.js';
 
@@ -16,7 +17,7 @@ function download(name, rows) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
+export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, onStatusChanged, ago }) {
   const E = { game: null, zones: [], bounds: null, help: [], standings: null };
 
   async function load() {
@@ -63,9 +64,9 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
       s.puzzles.forEach((p) => {
         const q = `${label} Q${p.idx + 1}`;
         if (!String(p.flag || '').trim()) add('bad', `${q}: no answer flag.`);
-        if (!String(p.prompt || '').trim()) add('bad', `${q}: no clue/prompt.`);
+        if (p.kind === 'photo' && !String(p.prompt || '').trim()) add('bad', `${q}: photo question has no clue.`);
+        if (!String(p.questionUrl || '').trim()) add('bad', `${q}: no link to the question page, so players cannot open it.`);
         if (p.kind === 'photo') {
-          if (!String(p.question || '').trim()) add('bad', `${q}: photo question has no follow-up question text.`);
           if ((p.refs || []).length < GOOD_REFS) add((p.refs || []).length < MIN_REFS ? 'bad' : 'warn', `${q}: ${(p.refs || []).length} reference photos (${MIN_REFS} is the minimum, aim for about 10).`);
         }
         seen(p.flag, q);
@@ -96,7 +97,7 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
     const qrRows = stops.filter((s) => s.role !== 'bonus').map((s) => `<label class="ready-row"><input type="checkbox" data-printed="${esc(s.id)}" ${done[s.id] ? 'checked' : ''} /> <span>${esc(s.place)}: QR printed &amp; posted</span></label>`).join('');
     $('#evReady').innerHTML = `<h3>READY FOR THE EVENT?</h3>
       <p class="ready-sum"><b style="color:${bad ? '#f28b82' : '#7fdc99'}">${bad} blocker${bad === 1 ? '' : 's'}</b> · <b style="color:#fdd663">${warn} warning${warn === 1 ? '' : 's'}</b> <button type="button" class="mini" id="evReadyRefresh">re-check</button></p>
-      <div class="ready-list">${list.map((c) => `<div class="ready-row ${c.level}"><span>${{ bad: '✕', warn: '⚠', ok: '✓' }[c.level]}</span><span>${esc(c.text)}</span></div>`).join('')}</div>
+      <div class="ready-list">${list.map((c) => `<div class="ready-row ${c.level}"><span>${icon({ bad: 'x', warn: 'bell', ok: 'check' }[c.level])}</span><span>${esc(c.text)}</span></div>`).join('')}</div>
       <details><summary class="hint">Tick off QR codes as you post them</summary><div class="ready-list">${qrRows}</div></details>`;
   }
 
@@ -115,7 +116,7 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
         <label class="field">SCHEDULED START (OPTIONAL)<input type="datetime-local" id="evStart" value="${toLocalInput(g.startsAt)}" /></label>
         <label class="field">HARD END (OPTIONAL)<input type="datetime-local" id="evEnd" value="${toLocalInput(g.endsAt)}" /></label>
         <label class="field">PUBLIC BIG-SCREEN BOARD<select id="evBoard"><option value="false" ${!g.boardPublic ? 'selected' : ''}>Off</option><option value="true" ${g.boardPublic ? 'selected' : ''}>On (open /board/ on the projector)</option></select></label></div>
-      <div class="btn-row"><button type="button" class="btn save" id="evSaveSchedule">Save schedule and options</button></div>
+      <div class="btn-row"><button type="button" class="btn" id="evSaveSchedule">Save schedule and options</button></div>
       <p class="hint">While the quest is not running, players can look around but check-ins, unlocks, photos and flags are refused. Starting requires teams to be locked in.</p>`;
   }
 
@@ -129,7 +130,7 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
   }
 
   function zoneRow(z, i) {
-    return `<div class="nogo-row" data-zone="${i}"><input data-z="label" value="${esc(z.label)}" placeholder="Label" /><input data-z="lat" value="${z.lat}" placeholder="lat" /><input data-z="lng" value="${z.lng}" placeholder="lng" /><input data-z="radius" value="${z.radius}" placeholder="r (m)" /><button type="button" class="btn danger" data-rm-zone="${i}">×</button></div>`;
+    return `<div class="nogo-row" data-zone="${i}"><input data-z="label" value="${esc(z.label)}" placeholder="Label" /><input data-z="lat" value="${z.lat}" placeholder="lat" /><input data-z="lng" value="${z.lng}" placeholder="lng" /><input data-z="radius" value="${z.radius}" placeholder="r (m)" /><button type="button" class="btn danger" data-rm-zone="${i}">${icon('x')}</button></div>`;
   }
   function renderSafety() {
     const b = E.bounds;
@@ -151,7 +152,7 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
 
   function renderStandings() {
     const rows = E.standings?.rows || [];
-    $('#evStandings').innerHTML = `<h3>STANDINGS</h3><table><thead><tr><th>#</th><th>Team</th><th>Players</th><th>Locations cleared</th><th>Flags</th><th>Handed in</th><th>Time</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r.rank}</td><td><b>${esc(r.name)}</b></td><td>${r.players}</td><td>${r.stopsCleared}</td><td>${r.flags}</td><td>${r.hubFlags}</td><td>${r.finishedAt ? `🏁 ${mmss(r.elapsedSeconds)}` : r.startedAt ? 'playing' : 'not started'}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">No locked teams yet.</td></tr>'}</tbody></table>`;
+    $('#evStandings').innerHTML = `<h3>STANDINGS</h3><table><thead><tr><th>#</th><th>Team</th><th>Players</th><th>Locations cleared</th><th>Flags</th><th>Handed in</th><th>Time</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r.rank}</td><td><b>${esc(r.name)}</b></td><td>${r.players}</td><td>${r.stopsCleared}</td><td>${r.flags}</td><td>${r.hubFlags}</td><td>${r.finishedAt ? `${icon('flag')} ${mmss(r.elapsedSeconds)}` : r.startedAt ? 'playing' : 'not started'}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">No locked teams yet.</td></tr>'}</tbody></table>`;
   }
 
   function renderData() {
@@ -166,7 +167,7 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, ago }) {
   const send = async (patch, message) => {
     const result = await api.adminSetGame(patch);
     if (!result.ok) return toast(result.error || 'Could not save.');
-    toast(message); await load();
+    toast(message); await load(); onStatusChanged?.();
   };
 
   document.addEventListener('click', async (e) => {
