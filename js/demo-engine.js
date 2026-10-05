@@ -82,7 +82,7 @@ export function buildView({ content, state, game, announcements = [], team, now 
         const photoCleared = p.kind === 'photo' && state.photoCleared.includes(sid(s.id, idx));
         const solved = state.solved[sid(s.id, idx)];
         return {
-          idx, title: p.title, kind: p.kind, prompt: p.prompt, question: photoCleared ? p.question : null, photoCleared,
+          idx, title: p.title, kind: p.kind, prompt: p.prompt, questionUrl: p.kind === 'flag' || photoCleared ? p.questionUrl || null : null, photoCleared,
           pending: state.pending.includes(sid(s.id, idx)), solved: Boolean(solved), solvedBy: solved?.by ?? null,
         };
       }) : [],
