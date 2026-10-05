@@ -24,7 +24,7 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, onStatusCha
     try { E.game = await api.adminGame(); } catch (error) { console.warn(error); return; }
     E.zones = (E.game.noGo || []).map((z) => ({ ...z }));
     E.bounds = E.game.bounds ? { ...E.game.bounds } : null;
-    renderStatus(); renderBroadcast(); renderSafety(); renderData();
+    renderStatus(); renderSurprise(); renderBroadcast(); renderSafety(); renderData();
     renderReady();
     await refreshLive();
   }
@@ -120,6 +120,20 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, onStatusCha
       <p class="hint">While the quest is not running, players can look around but check-ins, unlocks, photos and flags are refused. Starting requires teams to be locked in.</p>`;
   }
 
+  async function renderSurprise() {
+    const list = await api.adminSurprises().catch(() => []);
+    const live = list.find((q) => !q.closedAt);
+    $('#evSurprise').innerHTML = `<h3>SURPRISE QUESTION</h3>
+      <p class="hint">Drop a question mid-event. Every phone gets a banner, and it appears at the top of the base for each team to answer once. Dropping a new one closes the previous one.</p>
+      ${live ? `<div class="qstat"><b>Live now:</b> ${esc(live.title)} · solved by ${live.solvedBy.length} team${live.solvedBy.length === 1 ? '' : 's'}${live.solvedBy.length ? ` (${esc(live.solvedBy.join(', '))})` : ''} <button type="button" class="btn danger" data-close-surprise="${live.id}">Close it</button></div>` : '<p class="hint">No surprise question is live.</p>'}
+      <label class="field">QUESTION TITLE<textarea id="evSqTitle" rows="2" maxlength="300" placeholder="Which building has the largest reading room?"></textarea></label>
+      <div class="form-grid"><label class="field">QUESTION LINK (OPTIONAL, HTTPS://...)<input id="evSqUrl" /></label>
+        <label class="field">FLAG THAT SOLVES IT<input id="evSqFlag" autocomplete="off" /></label></div>
+      <label class="field">BANNER TEXT (OPTIONAL)<input id="evSqAnnounce" maxlength="280" placeholder="Surprise question! Head to the base to answer it." /></label>
+      <div class="btn-row"><button type="button" class="btn save" id="evSqDrop">Drop it now</button></div>
+      ${list.length > (live ? 1 : 0) ? `<details class="fold"><summary>Earlier surprise questions</summary>${list.filter((q) => q.closedAt).map((q) => `<p class="hint">${esc(q.title)} · solved by ${q.solvedBy.length}${q.solvedBy.length ? ` (${esc(q.solvedBy.join(', '))})` : ''}</p>`).join('')}</details>` : ''}`;
+  }
+
   function renderBroadcast() {
     $('#evBroadcast').innerHTML = `<h3>BROADCAST A MESSAGE</h3>
       <label class="field">MESSAGE (SHOWN AS A BANNER ON EVERY PHONE)<textarea id="evMsg" maxlength="280" placeholder="e.g. Quest ends in 10 minutes. Head back to the base."></textarea></label>
@@ -182,6 +196,12 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, onStatusCha
     if (t.id === 'evSaveSchedule') return send({ startsAt: fromLocalInput($('#evStart').value), endsAt: fromLocalInput($('#evEnd').value), boardPublic: $('#evBoard').value === 'true' }, 'Saved.');
     if (t.id === 'evReadyRefresh') return renderReady();
     if (t.dataset?.printed) { const done = printed(); done[t.dataset.printed] = t.checked; try { localStorage.setItem(PRINTED_KEY, JSON.stringify(done)); } catch { /* optional */ } return; }
+    if (t.id === 'evSqDrop') {
+      const result = await api.adminSaveSurprise({ title: $('#evSqTitle').value, url: $('#evSqUrl').value, flag: $('#evSqFlag').value, announce: $('#evSqAnnounce').value });
+      if (!result.ok) return toast(result.error);
+      toast('Dropped. Phones show the banner and the question is at the base.'); return renderSurprise();
+    }
+    if (t.dataset?.closeSurprise) { await api.adminCloseSurprise(Number(t.dataset.closeSurprise)); toast('Closed.'); return renderSurprise(); }
     if (t.id === 'evSend') {
       const result = await api.adminBroadcast($('#evMsg').value, $('#evTo').value || null, $('#evLevel').value);
       if (!result.ok) return toast(result.error);
