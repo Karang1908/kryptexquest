@@ -12,7 +12,7 @@ export const hasBackend = Boolean(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
 
 const KEYS = {
   user: 'kq-demo-user', team: 'kq-demo-team', loc: 'kq-demo-loc', content: 'kq-demo-content-v2', subs: 'kq-demo-subs',
-  state: 'kq-demo-state-v4', game: 'kq-demo-game', announce: 'kq-demo-announce', help: 'kq-demo-help',
+  state: 'kq-demo-state-v4', game: 'kq-demo-game', announce: 'kq-demo-announce', help: 'kq-demo-help', surprise: 'kq-demo-surprise',
 };
 const norm = (value) => String(value || '').trim().toUpperCase();
 const readJson = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
@@ -86,7 +86,12 @@ const demoTeam = () => readJson(KEYS.team, null);
 
 function demoView() {
   const announcements = readJson(KEYS.announce, []).slice(-5).reverse();
-  return engine.buildView({ content: demoContent(), state: demoState(), game: demoGame(), announcements, team: demoTeam() });
+  const view = engine.buildView({ content: demoContent(), state: demoState(), game: demoGame(), announcements, team: demoTeam() });
+  if (view.stops?.length) {
+    const open = readJson(KEYS.surprise, []).filter((q) => !q.closedAt).pop();
+    view.surprise = open ? { id: open.id, title: open.title, url: open.url, at: open.at, solved: open.solvedBy.length > 0 } : null;
+  }
+  return view;
 }
 /** Run a rules-engine action against stored state, persist, and return { ...result, view }. */
 function demoAct(action, pos, ...args) {
@@ -117,6 +122,18 @@ async function rpc(name, args = {}) {
 }
 const where = (pos) => ({ p_lat: pos?.lat ?? null, p_lng: pos?.lng ?? null, p_acc: pos?.accuracy ?? 0 });
 
+/** Answer the current surprise question (once per team). */
+export async function submitSurprise(id, flag) {
+  if (hasBackend) return rpc('submit_surprise', { p_id: id, p_flag: flag });
+  const list = readJson(KEYS.surprise, []);
+  const q = list.find((x) => x.id === id && !x.closedAt);
+  if (!q) return withView({ ok: false, error: 'This surprise question is closed.' });
+  if (q.solvedBy.length) return withView({ ok: false, error: 'Your team already answered this one.' });
+  if (norm(flag) !== norm(q.flag)) return withView({ ok: false, error: 'That flag is not quite right. Check the question and try again.' });
+  q.solvedBy.push(demoTeam()?.name || 'Your team');
+  writeJson(KEYS.surprise, list);
+  return withView({ ok: true });
+}
 export const checkIn = async (pos) => (hasBackend ? rpc('hub_checkin', where(pos)) : demoAct(engine.checkIn, pos));
 /** Unlock a discovered location by typing its entry flag there. */
 export const unlock = async (stop, flag, pos) => (hasBackend ? rpc('unlock_stop', { p_stop: stop.id, p_flag: flag, ...where(pos) }) : demoAct(engine.unlockStop, pos, stop.id, flag));
@@ -305,6 +322,7 @@ export async function adminSaveLocation(stop) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ok: false, error: 'Latitude / longitude are not valid.' };
   if (!Number.isFinite(radius) || radius < 5 || radius > 500) return { ok: false, error: 'Radius must be 5 to 500 m.' };
   if (!stop.place?.trim() || !stop.name?.trim()) return { ok: false, error: 'Place name and quest title are required.' };
+  if (stop.entryUrl?.trim() && !/^https?:\/\/\S+$/i.test(stop.entryUrl.trim())) return { ok: false, error: 'The unlock question link must start with http:// or https://' };
   if (role === 'stop' && (!stop.exitFlag?.trim() || !stop.nextClue?.trim())) return { ok: false, error: 'A location needs its handoff flag and a next clue.' };
   const content = demoContent();
   if (role === 'hub' && content.some((s) => s.role === 'hub' && s.id !== id)) return { ok: false, error: 'There is already a base location.' };
@@ -312,7 +330,7 @@ export async function adminSaveLocation(stop) {
   const fields = {
     id, role, entryMode: stop.entryMode || 'chain', name: stop.name.trim(), place: stop.place.trim(), label: stop.label || 'NEW STOP', type: stop.type || (role === 'hub' ? 'hub' : 'custom'),
     icon: stop.icon || (role === 'hub' ? '⌂' : '◆'), lat, lng, radius, description: stop.description || '',
-    hint: stop.hint || '', entryQuestion: stop.entryQuestion?.trim() || null, entryAnswer: stop.entryAnswer?.trim() || null, exitFlag: stop.exitFlag?.trim() || null, nextClue: stop.nextClue?.trim() || null,
+    hint: stop.hint || '', entryQuestion: stop.entryQuestion?.trim() || null, entryUrl: stop.entryUrl?.trim() || null, entryAnswer: stop.entryAnswer?.trim() || null, exitFlag: stop.exitFlag?.trim() || null, nextClue: stop.nextClue?.trim() || null,
   };
   if (at >= 0) content[at] = { ...content[at], ...fields };
   else content.push({ ...fields, ord: role === 'hub' ? 0 : Math.max(0, ...content.map((s) => s.ord)) + 1, qrToken: Math.random().toString(36).slice(2, 10), puzzles: [] });
@@ -497,6 +515,28 @@ export async function adminBroadcast(message, teamId = null, level = 'info') {
   const list = readJson(KEYS.announce, []);
   list.push({ id: Date.now(), at: new Date().toISOString(), message: message.trim(), level });
   writeJson(KEYS.announce, list);
+  return { ok: true };
+}
+// ---------- admin: surprise questions ----------
+export async function adminSurprises() {
+  if (hasBackend) { const { data, error } = await (await supabase()).rpc('admin_surprises'); if (error) throw error; return data || []; }
+  return readJson(KEYS.surprise, []).slice().reverse();
+}
+export async function adminSaveSurprise(q) {
+  if (hasBackend) return adminRpc('admin_save_surprise', { p: q });
+  if (!q.title?.trim()) return { ok: false, error: 'A surprise question needs a title.' };
+  if (!q.flag?.trim()) return { ok: false, error: 'A surprise question needs its answer flag.' };
+  const url = q.url?.trim() || null;
+  if (url && !/^https?:\/\/\S+$/i.test(url)) return { ok: false, error: 'The question link must start with http:// or https://' };
+  const list = readJson(KEYS.surprise, []).map((x) => ({ ...x, closedAt: x.closedAt || new Date().toISOString() }));
+  list.push({ id: Date.now(), title: q.title.trim(), url, flag: q.flag.trim(), at: new Date().toISOString(), closedAt: null, solvedBy: [] });
+  writeJson(KEYS.surprise, list);
+  await adminBroadcast(q.announce?.trim() || 'Surprise question! Head to the base to answer it.', null, 'warn');
+  return { ok: true };
+}
+export async function adminCloseSurprise(id) {
+  if (hasBackend) return adminRpc('admin_close_surprise', { p_id: id });
+  writeJson(KEYS.surprise, readJson(KEYS.surprise, []).map((x) => (x.id === id ? { ...x, closedAt: x.closedAt || new Date().toISOString() } : x)));
   return { ok: true };
 }
 export async function adminHelpRequests() {
