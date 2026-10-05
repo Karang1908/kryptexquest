@@ -1,11 +1,11 @@
 // Content management (locations, questions, answers, reference photos, QR codes) and photo review for the console.
 import * as api from '../js/api.js';
+import { icon, stopIcon, stopIconName, LOCATION_ICONS, hydrateIcons } from '../js/icons.js';
 
 const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const MIN_REFS = 3;
 const TARGET_REFS = 10;
-const ROLE_ICON = { hub: '⌂', stop: '', bonus: '★' };
 const mmss = (s) => (s == null ? '—' : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`);
 
 /** Where a stop's QR code points. Players scan it with the phone camera to prove they are there. */
@@ -54,18 +54,19 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
     const c = mapCenter();
     const n = playable().length + 1;
     const hasHub = C.stops.some((s) => s.role === 'hub');
-    return { id: '', ord: n, role: hasHub ? 'stop' : 'hub', entryMode: 'chain', name: '', place: '', label: `${String(n).padStart(2, '0')} / NEW STOP`, type: 'custom', icon: '◆', lat: c.lat, lng: c.lng, radius: 50, description: '', hint: '', entryQuestion: '', entryAnswer: '', exitFlag: 'KQ{}', nextClue: '', puzzles: [], isNew: true };
+    return { id: '', ord: n, role: hasHub ? 'stop' : 'hub', entryMode: 'chain', name: '', place: '', label: `${String(n).padStart(2, '0')} / NEW STOP`, type: 'custom', icon: 'pin', lat: c.lat, lng: c.lng, radius: 50, description: '', hint: '', entryQuestion: '', entryAnswer: '', exitFlag: 'KQ{}', nextClue: '', puzzles: [], isNew: true };
   }
 
   function render() {
     const hub = C.stops.find((s) => s.role === 'hub');
     const row = (s, i, fixed) => `<div class="loc-item ${C.selected === s.id ? 'active' : ''} ${fixed ? 'fixed-row' : ''}" data-select="${esc(s.id)}">
-        <span class="meta"><strong>${fixed ? '⌂' : `${i + 1}.${ROLE_ICON[s.role] ? ' ' + ROLE_ICON[s.role] : ''}`} ${esc(s.place)}</strong><small>${s.role === 'hub' ? 'Base · players start and hand in flags here' : `${s.role === 'bonus' ? 'Bonus · ' : ''}${s.entryMode === 'open' ? 'released from the start · ' : ''}${s.puzzles.length} question${s.puzzles.length === 1 ? '' : 's'} · r ${s.radius} m`}</small></span>
-        ${fixed ? '' : `<span class="mv"><span data-move="${esc(s.id)}:-1" title="Move earlier">▲</span><span data-move="${esc(s.id)}:1" title="Move later">▼</span></span>`}</div>`;
-    $('#locList').innerHTML = (hub ? row(hub, 0, true) : '<div class="hint">No base yet. Add a location and make it the Base.</div>')
+        <span class="li-icon">${stopIcon(s)}</span>
+        <span class="meta"><strong>${fixed ? '' : `${i + 1}. `}${esc(s.place)}</strong><small>${s.role === 'hub' ? 'Base: check-in and hand-in point' : `${s.role === 'bonus' ? 'Bonus · ' : ''}${s.entryMode === 'open' ? 'released at the start · ' : ''}${s.puzzles.length} question${s.puzzles.length === 1 ? '' : 's'}`}</small></span>
+        ${fixed || s.role === 'bonus' ? '' : `<span class="mv"><button type="button" data-move="${esc(s.id)}:-1" title="Move earlier" aria-label="Move earlier">${icon('arrow')}</button><button type="button" data-move="${esc(s.id)}:1" title="Move later" aria-label="Move later" class="down">${icon('arrow')}</button></span>`}</div>`;
+    $('#locList').innerHTML = (hub ? row(hub, 0, true) : '<div class="hint">No base yet. Add a location and set its role to Base.</div>')
       + playable().map((s, i) => row(s, i, false)).join('')
-      + (C.selected === 'new' ? '<div class="loc-item active"><span class="meta"><strong>New location</strong><small>not saved yet</small></span></div>' : '')
-      + (C.stops.length ? '<button type="button" class="btn" id="printAllQr">Print all QR codes</button>' : '');
+      + (C.selected === 'new' ? `<div class="loc-item active"><span class="li-icon">${icon('plus')}</span><span class="meta"><strong>New location</strong><small>not saved yet</small></span></div>` : '')
+      + (C.stops.length ? `<button type="button" class="btn" id="printAllQr">${icon('qr')} Print all QR codes</button>` : '');
     renderEditor();
   }
 
@@ -76,35 +77,42 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
   function renderEditor() {
     const stop = current();
     const box = $('#locEditor');
-    if (!stop) { box.innerHTML = '<div class="empty">No locations yet. Add the base first, then the locations.</div>'; return; }
+    if (!stop) { box.innerHTML = '<div class="empty big">No locations yet. Add the base first, then the locations.</div>'; return; }
     const isHubStop = stop.role === 'hub';
     const questions = isHubStop ? '' : stop.puzzles.map((p) => questionCard(stop, p)).join('') + C.draftQuestions.filter((d) => d.stop === stop.id).map(draftCard).join('');
-    const roleOptions = ['hub', 'stop', 'bonus'].map((r) => `<option value="${r}" ${stop.role === r ? 'selected' : ''}>${{ hub: 'Base (start / hand-in point)', stop: 'Location', bonus: 'Bonus question (finish screen, needs no location)' }[r]}</option>`).join('');
-    const modeOptions = [['chain', 'Sequential: hint + entry question are released at the base after the previous location\'s code is handed in'], ['open', 'Released right after check-in']].map(([v, l]) => `<option value="${v}" ${stop.entryMode === v ? 'selected' : ''}>${l}</option>`).join('');
-    box.innerHTML = `<div class="panel"><h3>${stop.isNew ? 'NEW LOCATION' : isHubStop ? 'BASE' : `LOCATION ${stop.ord}`}</h3>
-      <div class="form-grid">
-        <label class="field">ID (permanent, a-z 0-9 - _)<input id="ed-id" value="${esc(stop.id)}" ${stop.isNew ? '' : 'disabled'} placeholder="cafeteria" /></label>
-        <label class="field">ROLE<select id="ed-role">${roleOptions}</select></label>
-        ${field('ed-place', 'PLACE NAME (SHOWN WHEN A TEAM UNLOCKS IT)', stop.place)}
-        ${field('ed-name', 'QUEST TITLE', stop.name)}
-        ${field('ed-label', 'BADGE TEXT', stop.label)}
-        ${field('ed-icon', 'ICON (EMOJI OR SYMBOL)', stop.icon)}
-        ${field('ed-type', 'TYPE', stop.type)}
-        ${field('ed-radius', 'INTERACT RADIUS (M)', stop.radius)}
-        <label class="field wide">DESCRIPTION<textarea id="ed-desc">${esc(stop.description)}</textarea></label>
-        ${field('ed-lat', 'LATITUDE', stop.lat)}
-        ${field('ed-lng', 'LONGITUDE', stop.lng)}
-        <div class="field"><span>POSITION</span><button type="button" class="btn" id="edPlaceMap">Place on the map…</button></div>
-        ${isHubStop || stop.role === 'bonus' ? '' : `<label class="field wide">HINT SHOWN AT THE BASE ONCE RELEASED (HOW PLAYERS FIND THIS HIDDEN PLACE)<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>`}
-        ${stop.role === 'stop' ? `<label class="field wide">WHEN DOES THE BASE RELEASE ITS HINT?<select id="ed-mode">${modeOptions}</select></label>` : ''}
-        ${stop.role === 'stop' ? `${field('ed-eq', 'ENTRY QUESTION (OPTIONAL, SHOWN AT THE BASE ONCE RELEASED; ITS ANSWER IS THE ENTRY FLAG)', stop.entryQuestion || '', 'wide')}${field('ed-ea', 'ENTRY FLAG (TYPED AT THE LOCATION TO UNLOCK IT; BLANK = UNLOCKS WHEN DISCOVERED)', stop.entryAnswer || '', 'wide')}` : ''}
-        ${stop.role === 'stop' ? field('ed-exit', 'LOCATION CODE (shown when cleared; handed in at the base to unlock the NEXT location)', stop.exitFlag || '', 'wide') : ''}
-        ${stop.role === 'stop' ? `<label class="field wide">NEXT CLUE (SHOWN WHEN THIS LOCATION IS CLEARED)<textarea id="ed-clue">${esc(stop.nextClue || '')}</textarea></label>` : ''}
-      </div>
-      <div class="btn-row"><button type="button" class="btn save" id="edSaveLoc">${stop.isNew ? 'Create location' : 'Save location'}</button>
-        ${stop.isNew ? '<button type="button" class="btn" id="edCancelNew">Cancel</button>' : `<button type="button" class="btn" id="edQr">QR code</button><button type="button" class="btn danger" id="edDeleteLoc">Delete</button>`}</div></div>
-      ${stop.isNew || isHubStop ? (stop.isNew ? '<p class="hint">Create the location first, then add its questions.</p>' : '<p class="hint">The base has no questions. Players check in here, read each released location\'s hint and entry question, and hand in location codes.</p>')
-        : `<div class="btn-row"><button type="button" class="btn" data-add-q="photo">+ Photo question (clue, photo, then question)</button><button type="button" class="btn" data-add-q="flag">+ Flag question</button></div>${questions || '<div class="empty">No questions yet. Aim for 2-3 per location.</div>'}`}`;
+    const roleOptions = ['hub', 'stop'].map((r) => `<option value="${r}" ${stop.role === r ? 'selected' : ''}>${{ hub: 'Base (check-in and hand-in point)', stop: 'Location', bonus: 'Bonus question (shown on the finish screen)' }[r]}</option>`).join('');
+    const iconOptions = LOCATION_ICONS.map((n) => `<option value="${n}" ${stopIconName(stop) === n ? 'selected' : ''}>${n}</option>`).join('');
+    const modeOptions = [['chain', 'After the previous location\'s code is handed in'], ['open', 'Right after check-in']].map(([v, l]) => `<option value="${v}" ${stop.entryMode === v ? 'selected' : ''}>${l}</option>`).join('');
+    box.innerHTML = `<div class="ed-head"><div class="ed-title"><span class="li-icon big">${stopIcon(stop)}</span><div><h2>${stop.isNew ? 'New location' : esc(stop.place || 'Location')}</h2><small class="muted">${stop.isNew ? 'Fill in the basics, then add questions' : isHubStop ? 'The base' : stop.role === 'bonus' ? 'Bonus question' : `Location ${stop.ord}`}</small></div></div>
+        <div class="btn-row"><button type="button" class="btn save" id="edSaveLoc">${stop.isNew ? 'Create location' : 'Save'}</button>
+        ${stop.isNew ? '<button type="button" class="btn" id="edCancelNew">Cancel</button>' : `<button type="button" class="btn" id="edQr">${icon('qr')} QR code</button><button type="button" class="btn danger" id="edDeleteLoc">Delete</button>`}</div></div>
+      <section class="panel"><h3 class="sec">Basics</h3><div class="form-grid">
+        ${field('ed-place', 'Place name (shown once a team unlocks it)', stop.place)}
+        ${field('ed-name', 'Quest title', stop.name)}
+        <label class="field">Role<select id="ed-role">${roleOptions}</select></label>
+        <label class="field">Icon<select id="ed-icon">${iconOptions}</select></label>
+      </div></section>
+      <section class="panel"><h3 class="sec">Where</h3><div class="form-grid">
+        ${field('ed-lat', 'Latitude', stop.lat)}${field('ed-lng', 'Longitude', stop.lng)}${field('ed-radius', 'Radius (metres)', stop.radius)}
+        <div class="field"><span>Position</span><button type="button" class="btn" id="edPlaceMap">${icon('pin')} Place on the map</button></div>
+      </div></section>
+      ${stop.role === 'stop' ? `<section class="panel"><h3 class="sec">How teams find and unlock it</h3><div class="form-grid">
+        <label class="field wide">Hint shown at the base once it is released<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>
+        ${field('ed-eq', 'Entry question (optional; its answer is the entry flag)', stop.entryQuestion || '', 'wide')}
+        ${field('ed-ea', 'Entry flag, typed at the location (blank: unlocks when discovered)', stop.entryAnswer || '', 'wide')}
+        ${field('ed-exit', 'Location code, shown when cleared and handed in at the base', stop.exitFlag || '', 'wide')}
+        <label class="field wide">Next clue, shown when this location is cleared<textarea id="ed-clue">${esc(stop.nextClue || '')}</textarea></label>
+      </div></section>` : ''}
+      <details class="fold"><summary>More options</summary><div class="form-grid">
+        <label class="field">ID (permanent: a-z 0-9 - _)<input id="ed-id" value="${esc(stop.id)}" ${stop.isNew ? '' : 'disabled'} placeholder="cafeteria" /></label>
+        ${stop.role === 'stop' ? `<label class="field">Release<select id="ed-mode">${modeOptions}</select></label>` : ''}
+        ${field('ed-label', 'Badge text', stop.label)}${field('ed-type', 'Type', stop.type)}
+        <label class="field wide">Description<textarea id="ed-desc">${esc(stop.description)}</textarea></label>
+        ${isHubStop || stop.role === 'bonus' ? `<label class="field wide">Hint<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>` : ''}
+      </div></details>
+      ${stop.isNew || isHubStop ? (stop.isNew ? '<p class="hint">Create the location first, then add its questions.</p>' : '<p class="hint">The base has no questions. Teams check in here, read each released location\'s hint and entry question, and hand in location codes.</p>')
+        : `<section class="panel"><h3 class="sec">Questions</h3><div class="btn-row"><button type="button" class="btn" data-add-q="photo">${icon('camera')} Photo question</button><button type="button" class="btn" data-add-q="flag">${icon('flag')} Plain question</button></div>${questions || '<div class="empty">No questions yet. Aim for 2-3 per location.</div>'}</section>`}`;
+    hydrateIcons(box);
   }
 
   function statLine(stopId, idx) {
@@ -115,31 +123,32 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
 
   function questionCard(stop, p) {
     const refs = p.refs || [];
-    return `<div class="q-card" data-q="${p.idx}"><h4><span>QUESTION ${p.idx + 1}</span><span class="kind-tag ${p.kind}">${p.kind === 'photo' ? 'PHOTO → QUESTION' : 'FLAG'}</span></h4>
+    return `<div class="q-card" data-q="${p.idx}"><h4><span>Question ${p.idx + 1}</span><span class="kind-tag ${p.kind}">${p.kind === 'photo' ? 'Photo, then link' : 'Plain'}</span></h4>
       ${qFields(p, `q${p.idx}`)}${statLine(stop.id, p.idx)}
-      ${p.kind === 'photo' ? `<div><div class="ref-count ${refs.length < MIN_REFS ? 'low' : ''}">${refs.length} reference photo${refs.length === 1 ? '' : 's'} · take about ${TARGET_REFS} of the real object from different angles${refs.length < MIN_REFS ? ' (at least 3 needed before players can use it)' : ''}</div>
-        <div class="refs">${refs.map((r) => `<div class="ref"><img src="${esc(C.urls[r.path] || '')}" alt="reference" loading="lazy" /><button type="button" data-del-ref="${p.idx}:${esc(r.id)}" aria-label="Remove photo">×</button></div>`).join('')}
-        <label class="ref-add">+ Upload photos<input type="file" accept="image/*" multiple data-upload="${p.idx}" /></label></div></div>` : ''}
+      ${p.kind === 'photo' ? `<div><div class="ref-count ${refs.length < MIN_REFS ? 'low' : ''}">${refs.length} reference photo${refs.length === 1 ? '' : 's'} · take about ${TARGET_REFS} of the real object from different angles${refs.length < MIN_REFS ? ` (at least ${MIN_REFS} needed before players can use it)` : ''}</div>
+        <div class="refs">${refs.map((r) => `<div class="ref"><img src="${esc(C.urls[r.path] || '')}" alt="reference" loading="lazy" /><button type="button" data-del-ref="${p.idx}:${esc(r.id)}" aria-label="Remove photo">${icon('x')}</button></div>`).join('')}
+        <label class="ref-add">${icon('plus')} Upload photos<input type="file" accept="image/*" multiple data-upload="${p.idx}" /></label></div></div>` : ''}
       <div class="btn-row"><button type="button" class="btn save" data-save-q="${p.idx}">Save question</button><button type="button" class="btn danger" data-del-q="${p.idx}">Delete</button></div></div>`;
   }
+  /** A question is a title, a link to the real question page, the answer flag, and (photo questions) a clue. */
   function qFields(p, key) {
     const photo = p.kind === 'photo';
     return `<div class="form-grid">
-      <label class="field">TITLE<input data-f="${key}-title" value="${esc(p.title)}" /></label>
-      <label class="field">TYPE<select data-f="${key}-kind" data-kind-switch="${key}"><option value="photo" ${photo ? 'selected' : ''}>Photo of a real object, then a question</option><option value="flag" ${!photo ? 'selected' : ''}>Question only</option></select></label>
-      <label class="field wide">${photo ? 'CLUE (DESCRIBE THE OBJECT TO FIND; THE AI SEES THIS TOO)' : 'QUESTION TEXT'}<textarea data-f="${key}-prompt">${esc(p.prompt)}</textarea></label>
-      ${photo ? `<label class="field wide">QUESTION (REVEALED ONLY AFTER THE PHOTO IS VERIFIED)<textarea data-f="${key}-question">${esc(p.question || '')}</textarea></label>` : ''}
-      <label class="field wide">ANSWER / FLAG<input data-f="${key}-flag" value="${esc(p.flag || '')}" placeholder="KQ{...}" /></label></div>`;
+      <label class="field">Title<input data-f="${key}-title" value="${esc(p.title)}" /></label>
+      <label class="field">Type<select data-f="${key}-kind" data-kind-switch="${key}"><option value="photo" ${photo ? 'selected' : ''}>Photo of a real object, then the question link</option><option value="flag" ${!photo ? 'selected' : ''}>Question link only</option></select></label>
+      <label class="field wide">${photo ? 'Clue (describe the object to find; the AI reads this too)' : 'Note for players (optional)'}<textarea data-f="${key}-prompt">${esc(p.prompt)}</textarea></label>
+      <label class="field wide">Link to the question page${photo ? ' (revealed only after the photo is verified)' : ''}<input data-f="${key}-url" type="url" inputmode="url" placeholder="https://" value="${esc(p.questionUrl || '')}" /></label>
+      <label class="field wide">Answer flag<input data-f="${key}-flag" value="${esc(p.flag || '')}" placeholder="KQ{...}" /></label></div>`;
   }
   function draftCard(d) {
-    return `<div class="q-card" data-draft="${esc(d.key)}"><h4><span>NEW QUESTION</span><span class="kind-tag ${d.kind}">${d.kind === 'photo' ? 'PHOTO → QUESTION' : 'FLAG'}</span></h4>
+    return `<div class="q-card" data-draft="${esc(d.key)}"><h4><span>New question</span><span class="kind-tag ${d.kind}">${d.kind === 'photo' ? 'Photo, then link' : 'Plain'}</span></h4>
       ${qFields(d, d.key)}${d.kind === 'photo' ? '<p class="hint">Save the question, then upload its reference photos.</p>' : ''}
       <div class="btn-row"><button type="button" class="btn save" data-save-draft="${esc(d.key)}">Save question</button><button type="button" class="btn" data-drop-draft="${esc(d.key)}">Discard</button></div></div>`;
   }
 
   const val = (key, name) => document.querySelector(`[data-f="${key}-${name}"]`)?.value ?? '';
   function readQuestion(key, stopId, idx) {
-    return { stop: stopId, idx, title: val(key, 'title'), prompt: val(key, 'prompt'), kind: val(key, 'kind') || 'flag', flag: val(key, 'flag'), question: val(key, 'question') };
+    return { stop: stopId, idx, title: val(key, 'title'), prompt: val(key, 'prompt'), kind: val(key, 'kind') || 'flag', flag: val(key, 'flag'), questionUrl: val(key, 'url') };
   }
   function readLocation(stop) {
     const v = (id) => $(id)?.value ?? '';
@@ -198,7 +207,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
     }
     const add = t.closest('[data-add-q]');
     if (add) {
-      C.draftQuestions.push({ key: `d${Date.now()}`, stop: stop.id, kind: add.dataset.addQ, title: '', prompt: '', question: '', flag: '' });
+      C.draftQuestions.push({ key: `d${Date.now()}`, stop: stop.id, kind: add.dataset.addQ, title: '', prompt: '', questionUrl: '', flag: '' });
       renderEditor();
     }
     const saveQ = t.closest('[data-save-q]');
@@ -243,11 +252,11 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
     if (sw) {
       const draft = C.draftQuestions.find((d) => d.key === sw);
       const stop = current();
-      if (draft) { Object.assign(draft, { kind: t.value, title: val(sw, 'title'), prompt: val(sw, 'prompt'), question: val(sw, 'question'), flag: val(sw, 'flag') }); renderEditor(); }
+      if (draft) { Object.assign(draft, { kind: t.value, title: val(sw, 'title'), prompt: val(sw, 'prompt'), questionUrl: val(sw, 'url'), flag: val(sw, 'flag') }); renderEditor(); }
       else {
         const idx = Number(sw.slice(1));
         const current_ = stop.puzzles.find((p) => p.idx === idx);
-        Object.assign(current_, { kind: t.value, title: val(sw, 'title'), prompt: val(sw, 'prompt'), question: val(sw, 'question') || current_.question, flag: val(sw, 'flag') });
+        Object.assign(current_, { kind: t.value, title: val(sw, 'title'), prompt: val(sw, 'prompt'), questionUrl: val(sw, 'url'), flag: val(sw, 'flag') });
         renderEditor();
         toast('Type changed. Fill the new fields and press Save question.');
       }
