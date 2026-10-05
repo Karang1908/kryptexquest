@@ -307,7 +307,7 @@ function renderTeamList() {
   $('#teamList').innerHTML = sorted.length ? sorted.map((t) => `<button type="button" class="team-item ${A.selectedTeam === t.id ? 'active' : ''}" data-team="${esc(t.id)}">
       <div class="top"><strong>${esc(t.name)}${t.isTest ? ' <span class="mini test">TEST</span>' : ''}${A.alerts.some((a) => a.teamId === t.id) ? `<span class="flag-alert" title="Needs attention">${icon('bell')}</span>` : ''}</strong><span class="score digits">${t.solved.length}/${totalFlags()}</span></div>
       <div class="pips">${A.stops.flatMap((s) => s.puzzles.map((p) => `<i class="${p.kind} ${t.solved.some((x) => x.stopId === s.id && x.idx === p.idx) ? 'on' : ''}"></i>`)).join('')}</div>
-      <small>${t.members.length} players · ${stopsCleared(t)}/${A.stops.length} locations cleared · ${t.finishedAt ? 'finished' : t.locked ? 'playing' : 'not locked'} · active ${ago(t.lastActivity)}</small></button>`).join('')
+      <small>${t.members.length} players · ${stopsCleared(t)}/${regularStops().length} locations cleared · ${t.finishedAt ? 'finished' : t.locked ? 'playing' : 'not locked'} · active ${ago(t.lastActivity)}</small></button>`).join('')
     : '<div class="empty">No teams match.</div>';
 }
 $('#teamSearch').addEventListener('input', (e) => { A.teamQuery = e.target.value; renderTeamList(); });
