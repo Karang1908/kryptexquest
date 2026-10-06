@@ -67,6 +67,10 @@ Event tab: start / pause / end (plus optional scheduled start and hard end), bro
 - **Questions in a location are sequential** (0013 `question_locked`): later ones show only their number and "Locked"; `submit_flag` and `record_photo_clear` refuse skipping ahead. Mirrored in `js/demo-engine.js`.
 - Camera starts closer (zoom 20.6) with a wider field of view (70).
 
+### Deployment and load (2026-10-06)
+- `DEPLOY.md` has the Supabase, Google sign-in, Vercel and domain steps. `vercel.json` and `.vercelignore` are in place. Nothing is deployed yet; `js/config.js` still has empty Supabase settings and `allowSimulator: true` (set false for the event).
+- **Database-level load test** (scratch Postgres 14 on an Apple Silicon Mac, 500 players in 125 locked teams, two locations unlocked each; `pgbench` calling `my_progress()` about every 7 s and `update_my_location()` every 5 s per player = about 170 calls/s): average 5 ms per call (my_progress 7.6 ms, location 3.2 ms), no errors. Raw ceiling about 1,450 calls/s with 30 clients; a 3x spike (510 calls/s) held at about 520 calls/s. **This is the database only**: it excludes Supabase's API layer, auth checks, network and the free tier's smaller CPU, so the real numbers will be worse. The real test is `scripts/loadtest.mjs` against a throwaway Supabase project (untested).
+
 ### Console layout (revamp)
 Navbar: Live · Teams · Locations · Photos · Event, plus a status lamp for the event clock and sign-out. Activity log lives inside Teams (Teams | Activity). Live has the map with floating stats and a move bar for relocating a location (click a pin); Locations is a sectioned editor (Basics, Where, How teams find and unlock it, Questions; More options folded); Event folds Safety and Exports.
 
