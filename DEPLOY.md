@@ -42,8 +42,11 @@ brew install supabase/tap/supabase
 supabase login
 supabase link --project-ref YOUR-PROJECT-REF
 supabase functions deploy verify-photo
-supabase secrets set OLLAMA_API_KEY=your-key
+# keys: one per line in a file OUTSIDE the repo, up to 10 (more are ignored)
+supabase secrets set OLLAMA_API_KEYS="$(paste -sd, ~/ollama-keys.txt)"
+rm ~/ollama-keys.txt
 ```
+A key that returns 401, 402, 403 or 429 (or times out / 5xx) is skipped for a while and the next one is tried, up to 3 keys per photo, 20 s each. If all fail the photo goes to the review queue. The old single `OLLAMA_API_KEY` secret still works. The function logs which key position answered (never the key): `supabase functions logs verify-photo`.
 Optional secrets: `OLLAMA_MODEL`, `PHOTO_APPROVE_AT` (0.8), `PHOTO_REVIEW_AT` (0.5). This function has never run against the real API: take a few real reference and test photos and watch what verdicts come back before the event. If it fails, photos fall into the organiser review queue (Photos tab), so the game still works.
 
 ## 4. Point the site at Supabase
