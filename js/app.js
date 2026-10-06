@@ -274,6 +274,9 @@ function photoPicker(id, idx, { clue, pending, note, disabled = false }) {
       ${hasPhoto ? `<img class="photo-preview" src="${S.photo.url}" alt="Your photo" /><button class="primary-button" type="button" data-action="verify-photo" data-idx="${idx}" ${busy}>${S.busy ? 'Checking…' : 'Send photo'}</button>` : ''}`;
 }
 
+/** The base's place name ("Lobby"), used in directions. */
+const baseName = () => esc(S.stops.find((s) => s.role === 'hub')?.place || 'the base');
+
 /** The unlock question: its text, plus a link to the real question page when the organiser set one. */
 const entryLink = (stop) => (stop.entryUrl ? `<a class="q-link" href="${esc(stop.entryUrl)}" target="_blank" rel="noopener noreferrer">Open the question ${icon('out')}</a>` : '');
 function locationCard(stop, index, range) {
@@ -304,7 +307,7 @@ function renderHubSheet(hub) {
   const found = list.filter((s) => s.discovered && s !== next).sort((a, b) => a.ord - b.ord);
   let body = '';
   if (!v.started) {
-    body += `<div class="gate"><h3>Check in at the base</h3><p>Every team starts here. Check in once your whole team is at the vending machine area: your clock starts and your first hint appears.</p>
+    body += `<div class="gate"><h3>Check in at the base</h3><p>Every team starts here. Check in once your whole team is at ${baseName()}: your clock starts and your first hint appears.</p>
       <button class="primary-button" type="button" data-action="checkin" ${range && !S.busy ? '' : 'disabled'}>Check in</button></div>`;
   } else {
     if (next) {
@@ -342,7 +345,7 @@ function renderStopSheet(stop) {
   const clue = S.progress.clues[stop.id];
   let body;
   if (!unlocked && !stop.released) {
-    body = `<div class="gate"><h3>${icon('lock')} Locked</h3><p>You found it, but locations must be unlocked <b>in order</b>. Hand in the code from <b>Location ${stop.prevOrd}</b> at the base (the vending machine area) to get this location's hint and entry question. It stays on your map.</p><button class="primary-button" type="button" data-action="open-hub">Open the base</button></div>`;
+    body = `<div class="gate"><h3>${icon('lock')} Locked</h3><p>You found it, but locations must be unlocked <b>in order</b>. Hand in the code from <b>Location ${stop.prevOrd}</b> at the base (${baseName()}) to get this location's hint and entry question. It stays on your map.</p><button class="primary-button" type="button" data-action="open-hub">Open the base</button></div>`;
   } else if (!unlocked) {
     body = `<div class="gate"><h3>${icon('unlock')} Ready to unlock</h3>
       ${stop.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(stop.entryQuestion)}</p>${entryLink(stop)}` : stop.entryFlag ? `<p>Your entry flag: <code>${esc(stop.entryFlag)}</code></p>` : ''}
@@ -355,7 +358,7 @@ function renderStopSheet(stop) {
       <div class="bar"><i style="width:${(solvedCount(stop) / total) * 100}%"></i></div>
       <div class="puzzles">${stop.puzzles.map((p) => puzzleCard(stop, p)).join('')}</div>
       ${complete && clue && clue.exitFlag ? `<div class="clue">${clue.clue ? `<small>NEXT CLUE</small><strong>“${esc(clue.clue)}”</strong>` : ''}<small>YOUR LOCATION CODE</small><code>${esc(clue.exitFlag)}</code>
-        <p class="loc-note">Take this code to the base (the vending machine area) and hand it in: that unlocks the next location.</p></div>` : ''}`;
+        <p class="loc-note">Take this code to the base (${baseName()}) and hand it in: that unlocks the next location.</p></div>` : ''}`;
   }
   const hintLine = !unlocked && stop.hint ? `<p class="desc"><b>${icon('bulb')} Hint:</b> ${esc(stop.hint)}</p>` : `<p class="desc">${esc(stop.description || '')}</p>`;
   $('#sheetBody').innerHTML = `<div class="sheet-top"><button class="close" type="button" data-action="close-sheet" aria-label="Close">${icon('x')}</button></div>
