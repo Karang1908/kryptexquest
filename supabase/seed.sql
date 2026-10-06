@@ -11,29 +11,29 @@ insert into public.stops (id, ord, role, entry_mode, name, place, label, type, i
 
 insert into public.stop_secrets (stop_id, hint, entry_question, entry_answer, exit_flag, next_clue, entry_kind) values
   ('base', '', null, null, null, null, 'flag'),
-  ('lobby', 'Where every visitor first walks in.', 'Demo: what unlocks the first location? Type KQ{ENTER_LOBBY}.', 'KQ{ENTER_LOBBY}', 'KQ{OPEN_BOOK}', 'A place where you study, search, and get lost in stories.', 'flag'),
-  ('library', 'Where books stand shoulder to shoulder.', 'Demo: type KQ{ENTER_LIBRARY} to unlock the library.', 'KQ{ENTER_LIBRARY}', 'KQ{BUILD_IDEA}', 'Where hands and tools turn ideas into things.', 'flag'),
-  ('lab', 'Where experiments take shape.', 'Demo: photograph a door that leads into a lab or classroom.', null, 'KQ{GREEN_SIGNAL}', 'Go where the campus opens up to the sky.', 'photo'),
-  ('courtyard', 'Where the campus opens up to the sky.', null, 'KQ{ENTER_YARD}', 'KQ{QUEST_CLEAR}', 'Return to the base with every flag you found.', 'flag');
+  ('lobby', 'Where every visitor first walks in.', 'Demo: what unlocks the first location? Type GDG{ENTER_LOBBY}.', 'GDG{ENTER_LOBBY}', 'GDG{OPEN_BOOK}', 'A place where you study, search, and get lost in stories.', 'flag'),
+  ('library', 'Where books stand shoulder to shoulder.', 'Demo: type GDG{ENTER_LIBRARY} to unlock the library.', 'GDG{ENTER_LIBRARY}', 'GDG{BUILD_IDEA}', 'Where hands and tools turn ideas into things.', 'flag'),
+  ('lab', 'Where experiments take shape.', 'Demo: photograph a door that leads into a lab or classroom.', null, 'GDG{GREEN_SIGNAL}', 'Go where the campus opens up to the sky.', 'photo'),
+  ('courtyard', 'Where the campus opens up to the sky.', null, 'GDG{ENTER_YARD}', 'GDG{QUEST_CLEAR}', 'Return to the base with every flag you found.', 'flag');
 
 insert into public.puzzles (stop_id, idx, title, prompt, kind) values
   ('lobby', 0, 'Emergency eyes', 'Find the red device used to alert people in an emergency.', 'photo'),
-  ('lobby', 1, 'First contact', 'Demo question: type KQ{HELLO_CAMPUS} to say hello.', 'flag'),
-  ('lobby', 2, 'The last digit', 'Demo question: type KQ{LOBBY_CLEAR} to finish this location.', 'flag'),
+  ('lobby', 1, 'First contact', 'Demo question: type GDG{HELLO_CAMPUS} to say hello.', 'flag'),
+  ('lobby', 2, 'The last digit', 'Demo question: type GDG{LOBBY_CLEAR} to finish this location.', 'flag'),
   ('library', 0, 'Study light', 'Find the object used to light a study desk.', 'photo'),
-  ('library', 1, 'Shelf signal', 'Demo question: type KQ{STACKS}.', 'flag'),
+  ('library', 1, 'Shelf signal', 'Demo question: type GDG{STACKS}.', 'flag'),
   ('lab', 0, 'Safety first', 'Find a clearly marked exit or safety sign.', 'photo'),
-  ('lab', 1, 'The circuit', 'Demo question: type KQ{CIRCUIT}.', 'flag'),
+  ('lab', 1, 'The circuit', 'Demo question: type GDG{CIRCUIT}.', 'flag'),
   ('courtyard', 0, 'Living clue', 'Find a tree or planted greenery.', 'photo'),
-  ('courtyard', 1, 'Open air', 'Demo question: type KQ{OUTSIDE}.', 'flag');
+  ('courtyard', 1, 'Open air', 'Demo question: type GDG{OUTSIDE}.', 'flag');
 
 insert into public.puzzle_secrets (stop_id, idx, flag, question_url) values
   ('lobby', 0, null, null),
-  ('lobby', 1, 'KQ{HELLO_CAMPUS}', 'https://example.org/kryptex/lobby-2'),
-  ('lobby', 2, 'KQ{LOBBY_CLEAR}', 'https://example.org/kryptex/lobby-3'),
+  ('lobby', 1, 'GDG{HELLO_CAMPUS}', 'https://example.org/kryptex/lobby-2'),
+  ('lobby', 2, 'GDG{LOBBY_CLEAR}', 'https://example.org/kryptex/lobby-3'),
   ('library', 0, null, null),
-  ('library', 1, 'KQ{STACKS}', 'https://example.org/kryptex/library-2'),
+  ('library', 1, 'GDG{STACKS}', 'https://example.org/kryptex/library-2'),
   ('lab', 0, null, null),
-  ('lab', 1, 'KQ{CIRCUIT}', 'https://example.org/kryptex/lab-2'),
+  ('lab', 1, 'GDG{CIRCUIT}', 'https://example.org/kryptex/lab-2'),
   ('courtyard', 0, null, null),
-  ('courtyard', 1, 'KQ{OUTSIDE}', 'https://example.org/kryptex/courtyard-2');
+  ('courtyard', 1, 'GDG{OUTSIDE}', 'https://example.org/kryptex/courtyard-2');
