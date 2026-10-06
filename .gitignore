@@ -4,3 +4,9 @@
 supabase/seed.local.sql
 supabase/.temp/
 supabase/.branches/
+
+# real event content (codes, flags, reference photos): never in a public repo
+content/event.yaml
+content/photos/**/*.jpg
+content/photos/**/*.jpeg
+content/photos/**/*.png
