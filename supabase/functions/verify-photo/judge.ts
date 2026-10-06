@@ -55,9 +55,13 @@ export function parseVerdict(text: string): Verdict | null {
 }
 
 export function decide(verdict: Verdict, th = THRESHOLDS): Decision {
-  if (verdict.same && verdict.confidence >= th.approve) return 'match';
-  // A confident "yes" with a contradicting flag, or an unsure "yes", goes to a human.
-  if (verdict.confidence >= th.review) return 'review';
+  // Models read "confidence" two ways: as P(same) (what the prompt asks) or as certainty in their own answer
+  // (gemma4 does this: a clear mismatch comes back as same=false, confidence=1). Turn both into P(same):
+  // a "same" answer counts at face value; a "not same" answer counts as at most 1 - confidence, so it can never
+  // approve and only reaches review when the model is genuinely torn (about 0.5).
+  const pSame = verdict.same ? verdict.confidence : Math.min(verdict.confidence, 1 - verdict.confidence);
+  if (pSame >= th.approve) return 'match';
+  if (pSame >= th.review) return 'review';
   return 'no_match';
 }
 
