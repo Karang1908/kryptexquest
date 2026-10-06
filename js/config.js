@@ -17,6 +17,6 @@ export const CONFIG = {
   // Set false for the live event; the server must still verify location.
   allowSimulator: false,
 
-  // Phones must install the game as a home-screen app before playing (see js/install.js). Organisers can bypass with ?noinstall=1.
-  requireInstall: true,
+  // Phones in a browser tab are offered the home-screen install (js/install.js). They can close the panel with "Not now".
+  promptInstall: true,
 };
