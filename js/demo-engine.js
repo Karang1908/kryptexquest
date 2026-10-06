@@ -71,10 +71,10 @@ export function buildView({ content, state, game, announcements = [], team, now 
     const r = released(content, state, s);
     const hide = (value) => (d ? value : null);   // what a team has not discovered stays hidden: no name, no position
     return {
-      id: s.id, ord: s.ord, role: s.role, entryMode: s.entryMode, discovered: d, released: r, needsFlag: Boolean(s.entryAnswer),
+      id: s.id, ord: s.ord, role: s.role, entryMode: s.entryMode, discovered: d, released: r, needsFlag: s.entryKind !== 'photo' && Boolean(s.entryAnswer), entryKind: r ? s.entryKind || 'flag' : null, needsPhoto: s.entryKind === 'photo', entryPending: state.pending.includes(sid(s.id, -1)),
       name: hide(s.name), place: hide(s.place), label: hide(s.label), type: hide(s.type), icon: hide(s.icon), lat: hide(s.lat), lng: hide(s.lng), radius: hide(s.radius),
       description: hide(s.description),
-      hint: r ? s.hint || '' : null, entryQuestion: r ? s.entryQuestion || null : null, entryUrl: r ? s.entryUrl || null : null, entryImages: r ? (s.entryImages || []).map((i) => i.path ?? i) : [], entryFlag: r && !s.entryQuestion ? s.entryAnswer || null : null,
+      hint: r ? s.hint || '' : null, entryQuestion: r ? s.entryQuestion || null : null, entryUrl: r ? s.entryUrl || null : null, entryFlag: r && s.entryKind !== 'photo' && !s.entryQuestion ? s.entryAnswer || null : null,
       prevOrd: prevStop(content, s)?.ord ?? null,
       state: cleared ? 'cleared' : open ? 'open' : 'locked', puzzleCount: s.puzzles.length,
       exitFlag: cleared ? s.exitFlag : null, nextClue: cleared ? s.nextClue : null,
@@ -84,7 +84,7 @@ export function buildView({ content, state, game, announcements = [], team, now 
         const locked = questionLocked(state, s, idx);
         return {
           idx, kind: p.kind, locked, title: locked ? null : p.title, prompt: locked ? null : p.prompt,
-          questionUrl: !locked && (p.kind === 'flag' || photoCleared) ? p.questionUrl || null : null, photoCleared,
+          questionUrl: !locked && p.kind === 'flag' ? p.questionUrl || null : null, photoCleared,
           pending: state.pending.includes(sid(s.id, idx)), solved: Boolean(solved), solvedBy: solved?.by ?? null,
         };
       }) : [],
@@ -139,6 +139,7 @@ export function unlockStop(ctx, stopId, flag) {
     const prev = prevStop(ctx.content, stop);
     return fail(`Locked. Unlock the locations in order: hand in the code from Location ${prev?.ord ?? '?'} at the base to get this one's hint and entry question.`);
   }
+  if (stop.entryKind === 'photo') return fail('This location unlocks with a photo. Take it at the location.');
   if (stop.entryAnswer && norm(flag) !== norm(stop.entryAnswer)) return fail("That is not this location's entry flag. Check the hint and question you got at the base.");
   ctx.state.discovered ||= [];
   if (!ctx.state.discovered.includes(stopId)) ctx.state.discovered.push(stopId);
@@ -174,22 +175,35 @@ export function submitFlag(ctx, stopId, idx, flag) {
   if (!stop || !puzzle || stop.role === 'hub') return fail('Unknown question.');
   if (!stopOpen(ctx.content, ctx.state, stopId)) return fail('Unlock this location first.');
   if (questionLocked(ctx.state, stop, idx)) return fail('Solve the earlier questions first.');
-  if (puzzle.kind === 'photo' && !ctx.state.photoCleared.includes(sid(stopId, idx))) return fail('Photograph the object first. The question appears after the photo.');
+  if (puzzle.kind === 'photo') return fail('This one is solved with a photo, not a flag.');
   if (norm(flag) !== norm(puzzle.flag)) { ((ctx.state.wrong ||= {})[stopId] ||= 0); ctx.state.wrong[stopId]++; return fail('That flag is not quite right. Check the clue and try again.'); }
   ctx.state.solved[sid(stopId, idx)] = { by: ctx.me, at: ctx.now };
   checkFinish(ctx.content, ctx.state, ctx.now);
   return { ok: true };
 }
 
-/** Demo has no AI: the photo stage clears on any photo, and says so. */
+/** Demo has no AI: any photo is accepted, and says so. idx -1 is a location's unlock photo; idx >= 0 is an image question. */
 export function photoClear(ctx, stopId, idx) {
   const err = guard(ctx); if (err) return fail(err);
   const stop = byId(ctx.content, stopId);
-  if (!stop?.puzzles[idx] || stop.puzzles[idx].kind !== 'photo') return fail('Unknown photo question.');
+  if (idx === -1) {
+    if (!stop || stop.role !== 'stop' || stop.entryKind !== 'photo') return fail('This location does not unlock with a photo.');
+    if (stopOpen(ctx.content, ctx.state, stopId)) return { ok: true, cleared: true, simulated: true, already: true };
+    if (!inRange(ctx.content, ctx.state, stopId, ctx.pos, ctx.now)) return fail('You need to be at this location. Indoors? Scan the QR code posted there.');
+    if (!released(ctx.content, ctx.state, stop)) return fail("Locked. Hand in the previous location's code at the base first.");
+    ctx.state.discovered ||= [];
+    if (!ctx.state.discovered.includes(stopId)) ctx.state.discovered.push(stopId);
+    ctx.state.unlocked.push(stopId);
+    stamp(ctx, 'unlocked', stopId);
+    return { ok: true, cleared: true, simulated: true, place: stop.place };
+  }
+  if (!stop?.puzzles[idx] || stop.puzzles[idx].kind !== 'photo') return fail('Unknown image question.');
   if (!stopOpen(ctx.content, ctx.state, stopId)) return fail('Unlock this location first.');
   if (questionLocked(ctx.state, stop, idx)) return fail('Solve the earlier questions first.');
   const key = sid(stopId, idx);
   if (!ctx.state.photoCleared.includes(key)) ctx.state.photoCleared.push(key);
+  ctx.state.solved[key] = { by: ctx.me, at: ctx.now };
+  checkFinish(ctx.content, ctx.state, ctx.now);
   return { ok: true, cleared: true, simulated: true };
 }
 
