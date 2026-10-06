@@ -54,7 +54,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
     const c = mapCenter();
     const n = playable().length + 1;
     const hasHub = C.stops.some((s) => s.role === 'hub');
-    return { id: '', ord: n, role: hasHub ? 'stop' : 'hub', entryMode: 'chain', name: '', place: '', label: `${String(n).padStart(2, '0')} / NEW STOP`, type: 'custom', icon: 'pin', lat: c.lat, lng: c.lng, radius: 50, description: '', hint: '', entryKind: 'flag', entryQuestion: '', entryAnswer: '', exitFlag: 'KQ{}', nextClue: '', puzzles: [], isNew: true };
+    return { id: '', ord: n, role: hasHub ? 'stop' : 'hub', entryMode: 'chain', name: '', place: '', label: `${String(n).padStart(2, '0')} / NEW STOP`, type: 'custom', icon: 'pin', lat: c.lat, lng: c.lng, radius: 50, description: '', hint: '', entryKind: 'flag', entryQuestion: '', entryAnswer: '', exitFlag: 'GDG{}', nextClue: '', puzzles: [], isNew: true };
   }
 
   function render() {
@@ -162,7 +162,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
       <label class="field">Type<select data-f="${key}-kind" data-kind-switch="${key}"><option value="photo" ${photo ? 'selected' : ''}>Image question (photo, checked by AI)</option><option value="flag" ${!photo ? 'selected' : ''}>Flag question (link + flag)</option></select></label>
       <label class="field wide">${photo ? 'Clue (describe the object to photograph; the AI reads this too)' : 'Note for players (optional)'}<textarea data-f="${key}-prompt">${esc(p.prompt)}</textarea></label>
       ${photo ? '' : `<label class="field wide">Link to the question page<input data-f="${key}-url" type="url" inputmode="url" placeholder="https://" value="${esc(p.questionUrl || '')}" /></label>
-      <label class="field wide">Answer flag<input data-f="${key}-flag" value="${esc(p.flag || '')}" placeholder="KQ{...}" /></label>`}</div>`;
+      <label class="field wide">Answer flag<input data-f="${key}-flag" value="${esc(p.flag || '')}" placeholder="GDG{...}" /></label>`}</div>`;
   }
   function draftCard(d) {
     return `<div class="q-card" data-draft="${esc(d.key)}"><h4><span>New question</span><span class="kind-tag ${d.kind}">${d.kind === 'photo' ? 'Image question' : 'Flag question'}</span></h4>
