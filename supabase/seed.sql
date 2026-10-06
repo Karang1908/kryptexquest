@@ -9,12 +9,12 @@ insert into public.stops (id, ord, role, entry_mode, name, place, label, type, i
   ('lab', 3, 'stop', 'chain', 'Maker Mode', 'Academic Block', '03 / DISCOVERY', 'lab', '⚙', 25.1317, 55.41946, 50, 'Where experiments take shape.'),
   ('courtyard', 4, 'stop', 'chain', 'Final Frequency', 'Campus Courtyard', '04 / OPEN AIR', 'courtyard', '◆', 25.1305, 55.42, 50, 'The trail runs out into the open.');
 
-insert into public.stop_secrets (stop_id, hint, entry_question, entry_answer, exit_flag, next_clue) values
-  ('base', '', null, null, null, null),
-  ('lobby', 'Where every visitor first walks in.', 'Demo: what unlocks the first location? Type KQ{ENTER_LOBBY}.', 'KQ{ENTER_LOBBY}', 'KQ{OPEN_BOOK}', 'A place where you study, search, and get lost in stories.'),
-  ('library', 'Where books stand shoulder to shoulder.', 'Demo: type KQ{ENTER_LIBRARY} to unlock the library.', 'KQ{ENTER_LIBRARY}', 'KQ{BUILD_IDEA}', 'Where hands and tools turn ideas into things.'),
-  ('lab', 'Where experiments take shape.', 'Demo: type KQ{ENTER_LAB}.', 'KQ{ENTER_LAB}', 'KQ{GREEN_SIGNAL}', 'Go where the campus opens up to the sky.'),
-  ('courtyard', 'Where the campus opens up to the sky.', null, 'KQ{ENTER_YARD}', 'KQ{QUEST_CLEAR}', 'Return to the base with every flag you found.');
+insert into public.stop_secrets (stop_id, hint, entry_question, entry_answer, exit_flag, next_clue, entry_kind) values
+  ('base', '', null, null, null, null, 'flag'),
+  ('lobby', 'Where every visitor first walks in.', 'Demo: what unlocks the first location? Type KQ{ENTER_LOBBY}.', 'KQ{ENTER_LOBBY}', 'KQ{OPEN_BOOK}', 'A place where you study, search, and get lost in stories.', 'flag'),
+  ('library', 'Where books stand shoulder to shoulder.', 'Demo: type KQ{ENTER_LIBRARY} to unlock the library.', 'KQ{ENTER_LIBRARY}', 'KQ{BUILD_IDEA}', 'Where hands and tools turn ideas into things.', 'flag'),
+  ('lab', 'Where experiments take shape.', 'Demo: photograph a door that leads into a lab or classroom.', null, 'KQ{GREEN_SIGNAL}', 'Go where the campus opens up to the sky.', 'photo'),
+  ('courtyard', 'Where the campus opens up to the sky.', null, 'KQ{ENTER_YARD}', 'KQ{QUEST_CLEAR}', 'Return to the base with every flag you found.', 'flag');
 
 insert into public.puzzles (stop_id, idx, title, prompt, kind) values
   ('lobby', 0, 'Emergency eyes', 'Find the red device used to alert people in an emergency.', 'photo'),
@@ -28,12 +28,12 @@ insert into public.puzzles (stop_id, idx, title, prompt, kind) values
   ('courtyard', 1, 'Open air', 'Demo question: type KQ{OUTSIDE}.', 'flag');
 
 insert into public.puzzle_secrets (stop_id, idx, flag, question_url) values
-  ('lobby', 0, 'KQ{ALARM}', 'https://example.org/kryptex/lobby-1'),
+  ('lobby', 0, null, null),
   ('lobby', 1, 'KQ{HELLO_CAMPUS}', 'https://example.org/kryptex/lobby-2'),
   ('lobby', 2, 'KQ{LOBBY_CLEAR}', 'https://example.org/kryptex/lobby-3'),
-  ('library', 0, 'KQ{BRIGHT_MIND}', 'https://example.org/kryptex/library-1'),
+  ('library', 0, null, null),
   ('library', 1, 'KQ{STACKS}', 'https://example.org/kryptex/library-2'),
-  ('lab', 0, 'KQ{SAFE_ROUTE}', 'https://example.org/kryptex/lab-1'),
+  ('lab', 0, null, null),
   ('lab', 1, 'KQ{CIRCUIT}', 'https://example.org/kryptex/lab-2'),
-  ('courtyard', 0, 'KQ{ROOTED}', 'https://example.org/kryptex/courtyard-1'),
+  ('courtyard', 0, null, null),
   ('courtyard', 1, 'KQ{OUTSIDE}', 'https://example.org/kryptex/courtyard-2');
