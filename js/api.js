@@ -11,7 +11,7 @@ import { compressImage, blobToDataUrl } from './image.js';
 export const hasBackend = Boolean(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
 
 const KEYS = {
-  user: 'kq-demo-user', team: 'kq-demo-team', loc: 'kq-demo-loc', content: 'kq-demo-content-v2', subs: 'kq-demo-subs',
+  user: 'kq-demo-user', team: 'kq-demo-team', loc: 'kq-demo-loc', content: 'kq-demo-content-v3', subs: 'kq-demo-subs',
   state: 'kq-demo-state-v4', game: 'kq-demo-game', announce: 'kq-demo-announce', help: 'kq-demo-help', surprise: 'kq-demo-surprise',
 };
 const norm = (value) => String(value || '').trim().toUpperCase();
@@ -108,15 +108,9 @@ export async function loadView() {
   if (!hasBackend) return demoView();
   const { data, error } = await (await supabase()).rpc('my_progress');
   if (error) throw error;
-  return withImageUrls(data);
+  return data;
 }
 
-/** Unlock-question images live in a public bucket (players are meant to see them); demo mode keeps data URLs. */
-export const entryImageUrl = (path) => (/^(data:|https?:)/.test(path) ? path : `${CONFIG.supabaseUrl}/storage/v1/object/public/question-images/${path}`);
-function withImageUrls(view) {
-  if (view?.stops) for (const stop of view.stops) if (stop.entryImages?.length) stop.entryImages = stop.entryImages.map(entryImageUrl);
-  return view;
-}
 
 /** A failure to reach the server at all (as opposed to the server saying no). */
 const offlineish = (error) => (typeof navigator !== 'undefined' && navigator.onLine === false) || /failed to fetch|networkerror|network request failed|load failed/i.test(String(error?.message || ''));
@@ -125,7 +119,7 @@ async function rpc(name, args = {}) {
   const sb = await supabase();
   const { data, error } = await sb.rpc(name, args);
   if (error) return offlineish(error) ? { ok: false, offline: true, error: 'No connection.' } : { ok: false, error: error.message };
-  return { ...(data || { ok: true }), view: withImageUrls((await sb.rpc('my_progress')).data) };
+  return { ...(data || { ok: true }), view: (await sb.rpc('my_progress')).data };
 }
 const where = (pos) => ({ p_lat: pos?.lat ?? null, p_lng: pos?.lng ?? null, p_acc: pos?.accuracy ?? 0 });
 
@@ -329,6 +323,7 @@ export async function adminSaveLocation(stop) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ok: false, error: 'Latitude / longitude are not valid.' };
   if (!Number.isFinite(radius) || radius < 5 || radius > 500) return { ok: false, error: 'Radius must be 5 to 500 m.' };
   if (!stop.place?.trim() || !stop.name?.trim()) return { ok: false, error: 'Place name and quest title are required.' };
+  if ((stop.entryKind || 'flag') === 'photo' && role === 'stop' && !stop.entryQuestion?.trim()) return { ok: false, error: 'An image unlock needs a clue describing what to photograph.' };
   if (stop.entryUrl?.trim() && !/^https?:\/\/\S+$/i.test(stop.entryUrl.trim())) return { ok: false, error: 'The unlock question link must start with http:// or https://' };
   if (role === 'stop' && (!stop.exitFlag?.trim() || !stop.nextClue?.trim())) return { ok: false, error: 'A location needs its handoff flag and a next clue.' };
   const content = demoContent();
@@ -337,7 +332,7 @@ export async function adminSaveLocation(stop) {
   const fields = {
     id, role, entryMode: stop.entryMode || 'chain', name: stop.name.trim(), place: stop.place.trim(), label: stop.label || 'NEW STOP', type: stop.type || (role === 'hub' ? 'hub' : 'custom'),
     icon: stop.icon || (role === 'hub' ? '⌂' : '◆'), lat, lng, radius, description: stop.description || '',
-    hint: stop.hint || '', entryQuestion: stop.entryQuestion?.trim() || null, entryUrl: stop.entryUrl?.trim() || null, entryAnswer: stop.entryAnswer?.trim() || null, exitFlag: stop.exitFlag?.trim() || null, nextClue: stop.nextClue?.trim() || null,
+    hint: stop.hint || '', entryQuestion: stop.entryQuestion?.trim() || null, entryUrl: stop.entryUrl?.trim() || null, entryKind: stop.entryKind === 'photo' ? 'photo' : 'flag', entryAnswer: stop.entryKind === 'photo' ? null : stop.entryAnswer?.trim() || null, exitFlag: stop.exitFlag?.trim() || null, nextClue: stop.nextClue?.trim() || null,
   };
   if (at >= 0) content[at] = { ...content[at], ...fields };
   else content.push({ ...fields, ord: role === 'hub' ? 0 : Math.max(0, ...content.map((s) => s.ord)) + 1, qrToken: Math.random().toString(36).slice(2, 10), puzzles: [] });
@@ -362,15 +357,15 @@ export async function adminReorderLocations(ids) {
 }
 export async function adminSaveQuestion(q) {
   if (hasBackend) return adminRpc('admin_save_puzzle', { p: q });
-  const url = String(q.questionUrl || '').trim();
+  const url = q.kind === 'photo' ? '' : String(q.questionUrl || '').trim();
   if (!q.title?.trim()) return { ok: false, error: 'A question needs a title.' };
-  if (q.kind === 'photo' && !q.prompt?.trim()) return { ok: false, error: 'A photo question needs a clue describing the object to find.' };
-  if (!q.flag?.trim()) return { ok: false, error: 'Every question needs its answer flag.' };
+  if (q.kind === 'photo' && !q.prompt?.trim()) return { ok: false, error: 'An image question needs a clue describing the object to photograph.' };
+  if (q.kind === 'flag' && !q.flag?.trim()) return { ok: false, error: 'A flag question needs its answer flag.' };
   if (url && !/^https?:\/\/\S+$/i.test(url)) return { ok: false, error: 'The question link must start with http:// or https://' };
   const content = demoContent();
   const stop = content.find((s) => s.id === q.stop && s.role !== 'hub');
   if (!stop) return { ok: false, error: 'Unknown location.' };
-  const row = { title: q.title.trim(), prompt: String(q.prompt || '').trim(), kind: q.kind, flag: q.flag.trim(), questionUrl: url || null };
+  const row = { title: q.title.trim(), prompt: String(q.prompt || '').trim(), kind: q.kind, flag: q.kind === 'photo' ? null : q.flag.trim(), questionUrl: url || null };
   let idx = q.idx;
   if (idx == null) { stop.puzzles.push({ ...row, refs: [] }); idx = stop.puzzles.length - 1; }
   else stop.puzzles[idx] = { ...stop.puzzles[idx], ...row };
@@ -428,33 +423,39 @@ export async function adminUploadRefs(stopId, idx, files) {
   }
   return { ok: true, count: results.length };
 }
-/** Images for a location's unlock question. `current` is the list already saved (paths, or data URLs in demo mode). */
-export async function adminAddEntryImages(stopId, current, files) {
-  const paths = [...current];
+/** Reference photos for a location's UNLOCK photo (players photograph it at the location; the AI compares with these). */
+export async function adminUploadEntryRefs(stopId, files) {
+  let count = 0;
   for (const file of files) {
-    if (paths.length >= 6) return { ok: false, error: 'Up to 6 images per unlock question.', paths };
-    if (!hasBackend) { paths.push(await blobToDataUrl(await compressImage(file, 800, 0.7))); continue; }
-    const path = `${stopId}/${crypto.randomUUID()}.jpg`;
-    const up = await (await supabase()).storage.from('question-images').upload(path, await compressImage(file, 1280, 0.82), { contentType: 'image/jpeg' });
-    if (up.error) return { ok: false, error: up.error.message, paths };
-    paths.push(path);
+    if (!hasBackend) {
+      const content = demoContent();
+      const stop = content.find((x) => x.id === stopId);
+      if (!stop) return { ok: false, error: 'Save the location first.' };
+      (stop.entryRefs ||= []).push({ id: crypto.randomUUID(), path: await blobToDataUrl(await compressImage(file, 480, 0.7)) });
+      demoContentSave(content); count += 1; continue;
+    }
+    const sb = await supabase();
+    const path = `entry/${stopId}/${crypto.randomUUID()}.jpg`;
+    const up = await sb.storage.from('puzzle-refs').upload(path, await compressImage(file, 1024, 0.8), { contentType: 'image/jpeg' });
+    if (up.error) return { ok: false, error: up.error.message };
+    const row = await sb.from('entry_photo_refs').insert({ stop_id: stopId, path });
+    if (row.error) { await sb.storage.from('puzzle-refs').remove([path]); return { ok: false, error: row.error.message }; }
+    count += 1;
   }
-  return { ...(await saveEntryImages(stopId, paths)), paths };
+  return { ok: true, count };
 }
-export async function adminRemoveEntryImage(stopId, current, index) {
-  const path = current[index];
-  const paths = current.filter((_, i) => i !== index);
-  const result = await saveEntryImages(stopId, paths);
-  if (result.ok && hasBackend) await (await supabase()).storage.from('question-images').remove([path]);
-  return { ...result, paths };
-}
-async function saveEntryImages(stopId, paths) {
-  if (hasBackend) return adminRpc('admin_set_entry_images', { p_stop: stopId, p_paths: paths });
-  const content = demoContent();
-  const stop = content.find((x) => x.id === stopId);
-  if (!stop) return { ok: false, error: 'Save the location first.' };
-  stop.entryImages = paths; demoContentSave(content);
-  return { ok: true };
+export async function adminDeleteEntryRef(stopId, ref) {
+  if (!hasBackend) {
+    const content = demoContent();
+    const stop = content.find((x) => x.id === stopId);
+    if (stop) stop.entryRefs = (stop.entryRefs || []).filter((r) => r.id !== ref.id);
+    demoContentSave(content);
+    return { ok: true };
+  }
+  const sb = await supabase();
+  await sb.storage.from('puzzle-refs').remove([ref.path]);
+  const { error } = await sb.from('entry_photo_refs').delete().eq('id', ref.id);
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
 export async function adminDeleteRef(stopId, idx, ref) {
   if (!hasBackend) {
