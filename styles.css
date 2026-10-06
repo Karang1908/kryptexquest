@@ -490,7 +490,7 @@ button.gem:active { transform: translateY(3px); }
 
 .photo-pick.off { opacity: 0.5; pointer-events: none; }
 
-/* ---------- install gate: a full-screen panel that cannot be closed ---------- */
+/* ---------- install prompt: a full-screen panel with a "Not now" button ---------- */
 html.install-locked, html.install-locked body { overflow: hidden; }
 #installGate { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: calc(var(--safe-top) + 18px) 18px calc(var(--safe-bottom) + 18px); overflow-y: auto; background: var(--stars), radial-gradient(circle at 50% 20%, #34313f, #12111a 70%); }
 .ig-card { width: min(100%, 400px); display: grid; gap: 14px; justify-items: center; text-align: center; }
@@ -507,3 +507,5 @@ html.install-locked, html.install-locked body { overflow: hidden; }
 .ig-warn { margin: 0; padding: 10px 12px; border: 3px solid var(--ink); border-radius: 14px; background: #7a1f18; color: #ffd0cb; font-size: 14.5px; }
 .ig-done { display: grid; gap: 6px; padding: 14px; border: 3px solid var(--ink); border-radius: 16px; background: #1f6a3d; color: #fff; font-size: 16px; line-height: 1.4; }
 .ig-done b:first-child { font-family: var(--font-display); font-weight: 400; font-size: 26px; }
+
+.ig-close { width: 100%; margin-top: 4px; }
