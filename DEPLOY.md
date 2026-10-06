@@ -86,6 +86,13 @@ After the first deploy you get `https://PROJECT.vercel.app`. Test sign-in there 
 - Run a rehearsal with 5 to 10 real phones on campus: sign-in, GPS, a full location, a photo, hand-in, finish.
 - Set the start time, or start by hand from the Event tab.
 
+## 7b. Install gate (phones must install the app)
+- On a phone browser tab the game shows a full-screen, non-closable "Install to play" panel (`js/install.js`, switched by `requireInstall` in `js/config.js`). Installed copies (home-screen icon) and desktop browsers are not gated.
+- **Android (Chrome)**: one-tap "Install Kryptex Quest" button. **iPhone/iPad**: Apple provides no install button, so the panel shows Share > Add to Home Screen > Add. In-app browsers (Instagram, Facebook...) are told to open Safari/Chrome.
+- Organisers can skip the gate in a browser tab with `https://kryptex.gdgocbpdc.tech/?noinstall=1` (kept for that tab's session). Players could find this too: it is a client-side gate, not a security boundary.
+- **Test on real phones before the event**: Android Chrome install, iPhone Safari Add to Home Screen, then Google sign-in *inside the installed app* on both. iPhone installed apps keep their own storage (a browser sign-in does not carry over) and Google sign-in redirects inside installed apps are the most likely thing to misbehave. I could not test either here.
+- If a player's phone cannot install (old browser), they are blocked by design: have an organiser phone or a spare device ready, or share the `?noinstall=1` link with them.
+
 ## 8. Load test
 Database-level result (local Postgres 14, not Supabase, 500 players): about 170 calls/s averaged 5 ms with no errors, and a 3x spike held. Details in `CONTEXT.md`. That excludes Supabase's API layer, auth and the smaller free-tier CPU. To test the real thing, create a **throwaway Supabase project** with all migrations applied, then:
 ```
