@@ -99,20 +99,36 @@ Deno.serve(async (req) => {
   if (!membership || !(membership as any).teams?.locked) return json({ ok: false, error: 'Your team must be locked in before you can play.' });
   const teamId = membership.team_id as string;
 
+  // idx -1 is a location's UNLOCK photo (its reference photos live in entry_photo_refs); idx >= 0 is an image question.
+  const unlock = idx === -1;
   const { data: stop } = await admin.from('stops').select('lat,lng,radius_m,role').eq('id', stopId).maybeSingle();
-  const { data: puzzle } = await admin.from('puzzles').select('prompt,kind').eq('stop_id', stopId).eq('idx', idx).maybeSingle();
-  if (!stop || !puzzle || puzzle.kind !== 'photo') return json({ ok: false, error: 'Unknown photo puzzle.' }, 400);
+  let description: string | null;
+  if (unlock) {
+    if (!stop) return json({ ok: false, error: 'Unknown location.' }, 400);
+    const { data: secret } = await admin.from('stop_secrets').select('entry_question').eq('stop_id', stopId).maybeSingle();
+    description = secret?.entry_question ?? null;
+  } else {
+    const { data: puzzle } = await admin.from('puzzles').select('prompt,kind').eq('stop_id', stopId).eq('idx', idx).maybeSingle();
+    if (!stop || !puzzle || puzzle.kind !== 'photo') return json({ ok: false, error: 'Unknown image question.' }, 400);
+    description = puzzle.prompt;
+  }
   const dist = distanceM(lat, lng, stop.lat, stop.lng);
   const miss = (detail: string) =>
     admin.rpc('log_photo_miss', { p_user: userId, p_stop: stopId, p_idx: idx, p_lat: lat, p_lng: lng, p_dist: dist, p_detail: detail });
-  // Once a team has unlocked a location (which needed presence) its questions can be answered from anywhere,
-  // so the only gate is that the location is unlocked. record_photo_clear checks that too.
-  const { data: unlockedRow } = await admin.from('unlocks').select('stop_id').eq('team_id', teamId).eq('stop_id', stopId).maybeSingle();
-  if (!unlockedRow && stop.role !== 'bonus' && stop.role !== 'hub') {
-    const { data: openStop } = await admin.from('stops').select('entry_mode').eq('id', stopId).maybeSingle();
-    if (openStop?.entry_mode !== 'open') {
-      await miss('locked');
-      return json({ ok: false, error: 'Unlock this location first.' });
+  if (unlock) {
+    // Unlocking needs presence: the location must be released to the team and the phone must be at it.
+    const { data: gate } = await admin.rpc('unlock_photo_gate', { p_user: userId, p_stop: stopId, p_lat: lat, p_lng: lng, p_acc: acc });
+    if (gate) { await miss('unlock gate: ' + String(gate).slice(0, 80)); return json({ ok: false, error: String(gate) }); }
+  } else {
+    // Once a team has unlocked a location (which needed presence) its questions can be answered from anywhere,
+    // so the only gate is that the location is unlocked. record_photo_clear checks that too.
+    const { data: unlockedRow } = await admin.from('unlocks').select('stop_id').eq('team_id', teamId).eq('stop_id', stopId).maybeSingle();
+    if (!unlockedRow && stop.role !== 'bonus' && stop.role !== 'hub') {
+      const { data: openStop } = await admin.from('stops').select('entry_mode').eq('id', stopId).maybeSingle();
+      if (openStop?.entry_mode !== 'open') {
+        await miss('locked');
+        return json({ ok: false, error: 'Unlock this location first.' });
+      }
     }
   }
 
@@ -130,7 +146,9 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: 'That exact photo was already submitted. Take your own.' });
   }
 
-  const { data: refRows } = await admin.from('photo_refs').select('path').eq('stop_id', stopId).eq('idx', idx);
+  const { data: refRows } = unlock
+    ? await admin.from('entry_photo_refs').select('path').eq('stop_id', stopId)
+    : await admin.from('photo_refs').select('path').eq('stop_id', stopId).eq('idx', idx);
   if (!refRows?.length) return json({ ok: false, error: 'This question has no reference photos yet. Tell an organiser.' }, 503);
   const chosen = pickReferences(refRows, 4);
   const refs: Uint8Array[] = [];
@@ -145,7 +163,7 @@ Deno.serve(async (req) => {
   let reason = '';
   let model = Deno.env.get('OLLAMA_MODEL') ?? 'gemma4:31b';
   try {
-    const result = await askModel(bytes, refs, puzzle.prompt);
+    const result = await askModel(bytes, refs, description);
     model = result.model; confidence = result.verdict.confidence; reason = result.verdict.reason;
     verdictKind = decide(result.verdict, {
       approve: Number(Deno.env.get('PHOTO_APPROVE_AT') ?? THRESHOLDS.approve),
