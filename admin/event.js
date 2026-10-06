@@ -57,19 +57,26 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, onStatusCha
         if (s.puzzles.length < 2) add('bad', `${label}: has ${s.puzzles.length} question${s.puzzles.length === 1 ? '' : 's'} (the plan is 2-3).`);
         if (!String(s.exitFlag || '').trim()) add('bad', `${label}: no location code (handed in at the base).`);
         if (!String(s.hint || '').trim()) add('warn', `${label}: no hint. The base shows nothing to find it by.`);
-        if (String(s.entryQuestion || '').trim() && !String(s.entryAnswer || '').trim()) add('bad', `${label}: has an entry question but no entry flag, so nobody can answer it.`);
-        if (!String(s.entryAnswer || '').trim()) add('warn', `${label}: no entry flag, so it unlocks the moment a team discovers it (out-of-order discoveries still stay locked).`);
+        if (s.entryKind === 'photo') {
+          const n = (s.entryRefs || []).length;
+          if (!String(s.entryQuestion || '').trim()) add('bad', `${label}: image unlock has no clue.`);
+          if (n < GOOD_REFS) add(n < MIN_REFS ? 'bad' : 'warn', `${label}: ${n} unlock reference photos (${MIN_REFS} is the minimum, aim for about 10).`);
+        } else {
+          if (String(s.entryQuestion || '').trim() && !String(s.entryAnswer || '').trim()) add('bad', `${label}: has an unlock question but no flag, so nobody can answer it.`);
+          if (!String(s.entryAnswer || '').trim()) add('warn', `${label}: no unlock flag, so it unlocks the moment a team discovers it (out-of-order discoveries still stay locked).`);
+        }
         seen(s.exitFlag, `${label} code`); seen(s.entryAnswer, `${label} entry flag`);
       }
       s.puzzles.forEach((p) => {
         const q = `${label} Q${p.idx + 1}`;
-        if (!String(p.flag || '').trim()) add('bad', `${q}: no answer flag.`);
-        if (p.kind === 'photo' && !String(p.prompt || '').trim()) add('bad', `${q}: photo question has no clue.`);
-        if (!String(p.questionUrl || '').trim()) add('bad', `${q}: no link to the question page, so players cannot open it.`);
         if (p.kind === 'photo') {
+          if (!String(p.prompt || '').trim()) add('bad', `${q}: image question has no clue.`);
           if ((p.refs || []).length < GOOD_REFS) add((p.refs || []).length < MIN_REFS ? 'bad' : 'warn', `${q}: ${(p.refs || []).length} reference photos (${MIN_REFS} is the minimum, aim for about 10).`);
+        } else {
+          if (!String(p.flag || '').trim()) add('bad', `${q}: no answer flag.`);
+          if (!String(p.questionUrl || '').trim()) add('bad', `${q}: no link to the question page, so players cannot open it.`);
         }
-        seen(p.flag, q);
+        if (p.kind !== 'photo') seen(p.flag, q);
       });
     });
     flags.forEach((where, flag) => { if (where.length > 1) add('warn', `Same flag ${flag} used in: ${where.join(', ')}.`); });
