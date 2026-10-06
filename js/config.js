@@ -16,4 +16,7 @@ export const CONFIG = {
   // Walk-around simulator (WASD / on-screen pad) for testing off campus.
   // Set false for the live event; the server must still verify location.
   allowSimulator: false,
+
+  // Phones must install the game as a home-screen app before playing (see js/install.js). Organisers can bypass with ?noinstall=1.
+  requireInstall: true,
 };
