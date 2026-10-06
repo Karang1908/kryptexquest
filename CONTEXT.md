@@ -71,6 +71,12 @@ Event tab: start / pause / end (plus optional scheduled start and hard end), bro
 - `DEPLOY.md` has the Supabase, Google sign-in, Vercel and domain steps. `vercel.json` and `.vercelignore` are in place. Nothing is deployed yet; `js/config.js` still has empty Supabase settings and `allowSimulator: true` (set false for the event).
 - **Database-level load test** (scratch Postgres 14 on an Apple Silicon Mac, 500 players in 125 locked teams, two locations unlocked each; `pgbench` calling `my_progress()` about every 7 s and `update_my_location()` every 5 s per player = about 170 calls/s): average 5 ms per call (my_progress 7.6 ms, location 3.2 ms), no errors. Raw ceiling about 1,450 calls/s with 30 clients; a 3x spike (510 calls/s) held at about 520 calls/s. **This is the database only**: it excludes Supabase's API layer, auth checks, network and the free tier's smaller CPU, so the real numbers will be worse. The real test is `scripts/loadtest.mjs` against a throwaway Supabase project (untested).
 
+### Image and flag questions (migrations 0014, 0015)
+- Two separate question types, chosen when adding a question in the console: **Image question** (players photograph an object; the AI check, or an organiser, solves it; no flag or link) and **Flag question** (link to the real question page + answer flag).
+- A location's **unlock question** is also either type. Image unlock: clue + reference photos (`entry_photo_refs`); the team photographs it at the location and the AI unlocks it. The `verify-photo` function uses photo idx `-1` for unlock photos and asks `unlock_photo_gate` (released, started, in range) before spending an AI call.
+- The base editor lists every location's hint in one panel ("Hints shown at the base"); each hint is also on its location.
+- 0015 locks the public anon key out of every function except `public_leaderboard`. Live project: 0014 and 0015 applied and `verify-photo` redeployed on 2026-10-06.
+
 ### Console layout (revamp)
 Navbar: Live · Teams · Locations · Photos · Event, plus a status lamp for the event clock and sign-out. Activity log lives inside Teams (Teams | Activity). Live has the map with floating stats and a move bar for relocating a location (click a pin); Locations is a sectioned editor (Basics, Where, How teams find and unlock it, Questions; More options folded); Event folds Safety and Exports.
 
