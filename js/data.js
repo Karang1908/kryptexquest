@@ -24,7 +24,7 @@ export const DEMO_STOPS = [
     hint: 'Where every visitor first walks in.', entryQuestion: 'Demo: what unlocks the first location? Type KQ{ENTER_LOBBY}.', entryAnswer: 'KQ{ENTER_LOBBY}', qrToken: 'demolobby',
     exitFlag: 'KQ{OPEN_BOOK}', nextClue: 'A place where you study, search, and get lost in stories.',
     puzzles: [
-      { title: 'Emergency eyes', kind: 'photo', prompt: 'Find the red device used to alert people in an emergency.', questionUrl: 'https://example.org/kryptex/lobby-1', flag: 'KQ{ALARM}' },
+      { title: 'Emergency eyes', kind: 'photo', prompt: 'Find the red device used to alert people in an emergency.' },
       { title: 'First contact', kind: 'flag', prompt: 'Demo question: type KQ{HELLO_CAMPUS} to say hello.', questionUrl: 'https://example.org/kryptex/lobby-2', flag: 'KQ{HELLO_CAMPUS}' },
       { title: 'The last digit', kind: 'flag', prompt: 'Demo question: type KQ{LOBBY_CLEAR} to finish this location.', questionUrl: 'https://example.org/kryptex/lobby-3', flag: 'KQ{LOBBY_CLEAR}' },
     ],
@@ -35,17 +35,17 @@ export const DEMO_STOPS = [
     hint: 'Where books stand shoulder to shoulder.', entryQuestion: 'Demo: type KQ{ENTER_LIBRARY} to unlock the library.', entryAnswer: 'KQ{ENTER_LIBRARY}', qrToken: 'demolibrary',
     exitFlag: 'KQ{BUILD_IDEA}', nextClue: 'Where hands and tools turn ideas into things.',
     puzzles: [
-      { title: 'Study light', kind: 'photo', prompt: 'Find the object used to light a study desk.', questionUrl: 'https://example.org/kryptex/library-1', flag: 'KQ{BRIGHT_MIND}' },
+      { title: 'Study light', kind: 'photo', prompt: 'Find the object used to light a study desk.' },
       { title: 'Shelf signal', kind: 'flag', prompt: 'Demo question: type KQ{STACKS}.', questionUrl: 'https://example.org/kryptex/library-2', flag: 'KQ{STACKS}' },
     ],
   },
   {
     id: 'lab', ord: 3, role: 'stop', entryMode: 'chain', name: 'Maker Mode', place: 'Academic Block', label: '03 / DISCOVERY', type: 'lab', icon: '⚙',
     lat: 25.1317, lng: 55.41946, radius: 50, description: 'Where experiments take shape.',
-    hint: 'Where experiments take shape.', entryQuestion: 'Demo: type KQ{ENTER_LAB}.', entryAnswer: 'KQ{ENTER_LAB}', qrToken: 'demolab',
+    hint: 'Where experiments take shape.', entryKind: 'photo', entryQuestion: 'Demo: photograph a door that leads into a lab or classroom.', entryAnswer: null, qrToken: 'demolab',
     exitFlag: 'KQ{GREEN_SIGNAL}', nextClue: 'Go where the campus opens up to the sky.',
     puzzles: [
-      { title: 'Safety first', kind: 'photo', prompt: 'Find a clearly marked exit or safety sign.', questionUrl: 'https://example.org/kryptex/lab-1', flag: 'KQ{SAFE_ROUTE}' },
+      { title: 'Safety first', kind: 'photo', prompt: 'Find a clearly marked exit or safety sign.' },
       { title: 'The circuit', kind: 'flag', prompt: 'Demo question: type KQ{CIRCUIT}.', questionUrl: 'https://example.org/kryptex/lab-2', flag: 'KQ{CIRCUIT}' },
     ],
   },
@@ -55,7 +55,7 @@ export const DEMO_STOPS = [
     hint: 'Where the campus opens up to the sky.', entryQuestion: null, entryAnswer: 'KQ{ENTER_YARD}', qrToken: 'democourtyard',
     exitFlag: 'KQ{QUEST_CLEAR}', nextClue: 'Return to the base with every flag you found.',
     puzzles: [
-      { title: 'Living clue', kind: 'photo', prompt: 'Find a tree or planted greenery.', questionUrl: 'https://example.org/kryptex/courtyard-1', flag: 'KQ{ROOTED}' },
+      { title: 'Living clue', kind: 'photo', prompt: 'Find a tree or planted greenery.' },
       { title: 'Open air', kind: 'flag', prompt: 'Demo question: type KQ{OUTSIDE}.', questionUrl: 'https://example.org/kryptex/courtyard-2', flag: 'KQ{OUTSIDE}' },
     ],
   },
