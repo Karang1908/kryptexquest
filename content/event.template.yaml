@@ -1,0 +1,95 @@
+# KRYPTEX QUEST: event content. COPY this file to event.yaml and fill it in. Plain text, keep the indentation.
+# Flags look like GDG{SOMETHING}. Capitals and spaces do not matter when players type them.
+# Photos: put JPG/PNG files in the folders under content/photos/ (names do not matter, 3 to 10 per folder, 10 is best:
+# different angles, daylight and shade, near and far). Real phone photos of the REAL object, taken on campus.
+
+base:
+  place: "Lobby"                      # name players see at the base
+  description: "Start here. Check in, read the hints, and hand in the codes you collect."
+  lat: 25.13060                       # placeholder, organiser moves it on the map later
+  lng: 55.41800
+
+# Locations in WALKING ORDER: 1 = first, 3 = last.
+locations:
+
+  - id: sports-complex
+    place: "Sports Complex"
+    quest_title: ""                   # short title, e.g. "The Arena"
+    hint: ""                          # riddle shown at the base so players can find this location
+    unlock:                           # IMAGE unlock: players photograph this at the location
+      clue: ""                        # what to photograph, e.g. "The basketball hoop nearest the entrance"
+      photos: content/photos/sports-complex/unlock
+    questions:                        # answered in this order. Exactly 3: Q1 IMAGE, Q2 FLAG, Q3 FLAG.
+      - type: image
+        title: ""                     # e.g. "Eyes on the trophy"
+        clue: ""                      # what to photograph
+        photos: content/photos/sports-complex/q1
+      # question 2 and 3 are FLAG questions
+      - type: flag
+        title: ""
+        note: ""                      # optional extra text for players
+        link: ""                      # https:// link to the real question page
+        flag: "GDG{}"
+      - type: flag
+        title: ""
+        note: ""
+        link: ""
+        flag: "GDG{}"
+    location_code: "GDG{}"            # shown when the location is cleared; players hand it in at the Lobby
+    next_clue: ""                     # shown after clearing, points to the next location
+    lat: 25.13000                     # placeholder
+    lng: 55.41900
+
+  - id: mechanical-block
+    place: "Mechanical Block"
+    quest_title: ""
+    hint: ""
+    unlock:
+      clue: ""
+      photos: content/photos/mechanical-block/unlock
+    questions:
+      - type: image
+        title: ""
+        clue: ""
+        photos: content/photos/mechanical-block/q1
+      - type: flag
+        title: ""
+        note: ""
+        link: ""
+        flag: "GDG{}"
+      - type: flag
+        title: ""
+        note: ""
+        link: ""
+        flag: "GDG{}"
+    location_code: "GDG{}"
+    next_clue: ""
+    lat: 25.13200
+    lng: 55.41950
+
+  - id: library
+    place: "Library"
+    quest_title: ""
+    hint: ""
+    unlock:
+      clue: ""
+      photos: content/photos/library/unlock
+    questions:
+      - type: image
+        title: ""
+        clue: ""
+        photos: content/photos/library/q1
+      - type: flag
+        title: ""
+        note: ""
+        link: ""
+        flag: "GDG{}"
+      - type: flag
+        title: ""
+        note: ""
+        link: ""
+        flag: "GDG{}"
+    location_code: "GDG{}"
+    next_clue: "Return to the Lobby with every code you found."   # last location: send them back
+    lat: 25.13300
+    lng: 55.41700
