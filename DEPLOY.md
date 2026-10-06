@@ -12,7 +12,7 @@ The site is static files (no build). Vercel serves them; Supabase is the backend
 1. supabase.com > New project. Pick the region closest to Dubai (Mumbai or Frankfurt, whichever is offered). Save the database password.
 2. **Plan**: free tier is fine for testing. For the event month use Pro (about $25): free projects pause after a week of inactivity and have small compute. Decide this before the event, not during it.
 3. **Apply the SQL**, SQL Editor > New query, run these in order, one file at a time (copy each file's contents):
-   `supabase/migrations/0001_init.sql` to `0013_sequential_questions_entry_images.sql`.
+   `supabase/migrations/0001_init.sql` to `0015_lock_down_anon_functions.sql`.
    Quick way to get one file: `cat supabase/migrations/*.sql | pbcopy` (they sort correctly), then paste and run once.
    Every file must finish without an error. If one fails, stop and send me the message.
 4. **Seed content**: run `supabase/seed.sql` (sample flags: only for a rehearsal). For the real event create `supabase/seed.local.sql` (gitignored) with the real flags and locations and run that instead. You can also edit everything in the console at `/admin/` afterwards.
