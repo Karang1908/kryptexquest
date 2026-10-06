@@ -84,7 +84,7 @@ export function events({ limit, before, team, kind }, localT, state) {
     if (tm.startedAt) push({ at: tm.startedAt, kind: 'checkin', teamId: tm.id, teamName: tm.name, userName: tm.members[0]?.name, stopId: 'base', stopPlace: place('base') });
     tm.unlocked.forEach((u) => push({ at: u.at, kind: 'unlock', teamId: tm.id, teamName: tm.name, userName: u.userName, stopId: u.stopId, stopPlace: place(u.stopId), distM: 12 + ti * 3 }));
     tm.solved.forEach((s, i) => {
-      if (i % 3 === 1) push({ at: new Date(Date.parse(s.at) - 40000).toISOString(), kind: 'flag', ok: false, teamId: tm.id, teamName: tm.name, userId: s.userId, userName: s.userName, stopId: s.stopId, stopPlace: place(s.stopId), idx: s.idx, distM: 20 + i, detail: 'KQ{GUESS}' });
+      if (i % 3 === 1) push({ at: new Date(Date.parse(s.at) - 40000).toISOString(), kind: 'flag', ok: false, teamId: tm.id, teamName: tm.name, userId: s.userId, userName: s.userName, stopId: s.stopId, stopPlace: place(s.stopId), idx: s.idx, distM: 20 + i, detail: 'GDG{GUESS}' });
       push({ at: s.at, kind: 'flag', teamId: tm.id, teamName: tm.name, userId: s.userId, userName: s.userName, stopId: s.stopId, stopPlace: place(s.stopId), idx: s.idx, distM: 8 + i * 2 });
     });
     tm.hubFlags.forEach((stopId, i) => push({ at: new Date(Date.parse(tm.startedAt || tm.createdAt) + (60 + i) * 60000).toISOString(), kind: 'hub_flag', teamId: tm.id, teamName: tm.name, userName: tm.members[0]?.name, stopId, stopPlace: place(stopId) }));
