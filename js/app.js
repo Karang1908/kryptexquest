@@ -256,7 +256,7 @@ function puzzleCard(stop, p) {
   else {
     body = `${p.prompt ? `<p class="q-note">${esc(p.prompt)}</p>` : ''}
       ${p.questionUrl ? `<a class="q-link" href="${esc(p.questionUrl)}" target="_blank" rel="noopener noreferrer">Open the question ${icon('out')}</a>` : '<p class="loc-note">The question link is not set yet. Ask an organiser.</p>'}
-      <form class="flag-row" data-form="flag" data-idx="${p.idx}"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{...}" aria-label="Flag for ${esc(p.title)}" /><button class="small-action" type="submit" ${busy}>Submit</button></form>`;
+      <form class="flag-row" data-form="flag" data-idx="${p.idx}"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="GDG{...}" aria-label="Flag for ${esc(p.title)}" /><button class="small-action" type="submit" ${busy}>Submit</button></form>`;
   }
   return `<article class="puzzle ${p.solved ? 'solved' : ''} ${image && !p.solved ? 'photo' : ''}">
     <div class="puzzle-head"><span class="puzzle-num">${p.solved ? icon('check') : p.idx + 1}</span><strong>${esc(p.title)}</strong><small>${tag}</small></div>
@@ -321,14 +321,14 @@ function renderHubSheet(hub) {
       const q = v.surprise;
       body = `<article class="stop-card surprise ${q.solved ? 'cleared' : ''}"><div class="loc-head"><span class="loc-num">${icon('star')}</span><strong>Surprise question</strong><span class="chip-s">${q.solved ? 'SOLVED' : 'NEW'}</span></div>
         <p class="loc-hint">${icon('note')} ${esc(q.title)}</p>${q.url ? `<a class="q-link" href="${esc(q.url)}" target="_blank" rel="noopener noreferrer">Open the question ${icon('out')}</a>` : ''}
-        ${q.solved ? `<p class="loc-note">${icon('check')} Your team solved it.</p>` : `<form class="flag-row" data-form="surprise" data-id="${q.id}"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{...}" aria-label="Surprise question flag" ${range ? '' : 'disabled'} /><button class="primary-button" type="submit" ${range && !S.busy ? '' : 'disabled'}>Answer</button></form>${range ? '' : '<p class="loc-note">Answer it from the base.</p>'}`}</article>` + body;
+        ${q.solved ? `<p class="loc-note">${icon('check')} Your team solved it.</p>` : `<form class="flag-row" data-form="surprise" data-id="${q.id}"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="GDG{...}" aria-label="Surprise question flag" ${range ? '' : 'disabled'} /><button class="primary-button" type="submit" ${range && !S.busy ? '' : 'disabled'}>Answer</button></form>${range ? '' : '<p class="loc-note">Answer it from the base.</p>'}`}</article>` + body;
     }
     if (found.length) body += `<div class="section-title">Locations you found</div>${found.map((s) => locationCard(s, s.ord - 1, range)).join('')}`;
     const allIn = entered.length >= needed && needed > 0;
     body += `<div class="handin"><h3>Hand in your location codes</h3>
       <p class="loc-note">Each cleared location gives you a code. Enter it here to get your next hint. ${entered.length} / ${needed} handed in${allIn ? '. You have finished!' : '.'}</p>
       ${entered.length ? `<div class="handed">${entered.map((id) => `<span>${icon('check')} ${esc(S.stops.find((x) => x.id === id)?.place || id)}</span>`).join('')}</div>` : ''}
-      ${allIn ? '' : `<form class="flag-row" data-form="hub-flag"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{...}" aria-label="Location code" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Hand in</button></form>`}</div>`;
+      ${allIn ? '' : `<form class="flag-row" data-form="hub-flag"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="GDG{...}" aria-label="Location code" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Hand in</button></form>`}</div>`;
   }
   $('#sheetBody').innerHTML = `<div class="sheet-top"><button class="close" type="button" data-action="close-sheet" aria-label="Close">${icon('x')}</button></div>
     <h2>${esc(hub.name)}</h2><p class="place">${stopIcon(hub)} ${esc(hub.place)}</p><p class="desc">${esc(hub.description)}</p>${rangeBanner(hub)}${body}`;
@@ -347,7 +347,7 @@ function renderStopSheet(stop) {
     body = `<div class="gate"><h3>${icon('unlock')} Ready to unlock</h3>
       ${stop.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(stop.entryQuestion)}</p>${entryLink(stop)}` : stop.entryFlag ? `<p>Your entry flag: <code>${esc(stop.entryFlag)}</code></p>` : ''}
       ${stop.needsPhoto ? photoPicker(`${stop.id}:-1`, -1, { clue: null, pending: stop.entryPending, note: 'Photograph it here to unlock this location. The photo is checked automatically.', disabled: !range }) : stop.needsFlag ? `<p class="loc-note">Type this location's entry flag to unlock it.</p>
-      <form class="flag-row" data-form="unlock"><input class="flag-input" name="gate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{ENTRY_FLAG}" aria-label="Entry flag" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Unlock</button></form>`
+      <form class="flag-row" data-form="unlock"><input class="flag-input" name="gate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="GDG{ENTRY_FLAG}" aria-label="Entry flag" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Unlock</button></form>`
       : '<p class="loc-note">No flag needed: it unlocks by itself.</p>'}</div>`;
   } else {
     const total = stop.puzzles.length || 1;
