@@ -35,7 +35,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
 
   async function load(keepSelection = true) {
     try { C.stops = await api.adminContent(); } catch (error) { toast('Could not load content.'); console.error(error); return; }
-    const paths = C.stops.flatMap((s) => s.puzzles.flatMap((p) => (p.refs || []).map((r) => r.path)));
+    const paths = C.stops.flatMap((s) => [...(s.entryRefs || []).map((r) => r.path), ...s.puzzles.flatMap((p) => (p.refs || []).map((r) => r.path))]);
     C.urls = await api.signedUrls('puzzle-refs', paths);
     C.stats = Object.fromEntries((await api.adminQuestionStats().catch(() => [])).map((x) => [`${x.stopId}:${x.idx}`, x]));
     if (!keepSelection || (C.selected !== 'new' && !C.stops.some((s) => s.id === C.selected))) C.selected = C.stops.find((s) => s.role !== 'hub')?.id ?? C.stops[0]?.id ?? null;
@@ -54,7 +54,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
     const c = mapCenter();
     const n = playable().length + 1;
     const hasHub = C.stops.some((s) => s.role === 'hub');
-    return { id: '', ord: n, role: hasHub ? 'stop' : 'hub', entryMode: 'chain', name: '', place: '', label: `${String(n).padStart(2, '0')} / NEW STOP`, type: 'custom', icon: 'pin', lat: c.lat, lng: c.lng, radius: 50, description: '', hint: '', entryQuestion: '', entryAnswer: '', exitFlag: 'KQ{}', nextClue: '', puzzles: [], isNew: true };
+    return { id: '', ord: n, role: hasHub ? 'stop' : 'hub', entryMode: 'chain', name: '', place: '', label: `${String(n).padStart(2, '0')} / NEW STOP`, type: 'custom', icon: 'pin', lat: c.lat, lng: c.lng, radius: 50, description: '', hint: '', entryKind: 'flag', entryQuestion: '', entryAnswer: '', exitFlag: 'KQ{}', nextClue: '', puzzles: [], isNew: true };
   }
 
   function render() {
@@ -79,6 +79,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
     const box = $('#locEditor');
     if (!stop) { box.innerHTML = '<div class="empty big">No locations yet. Add the base first, then the locations.</div>'; return; }
     const isHubStop = stop.role === 'hub';
+    const unlockPhoto = stop.entryKind === 'photo';
     const questions = isHubStop ? '' : stop.puzzles.map((p) => questionCard(stop, p)).join('') + C.draftQuestions.filter((d) => d.stop === stop.id).map(draftCard).join('');
     const roleOptions = ['hub', 'stop'].map((r) => `<option value="${r}" ${stop.role === r ? 'selected' : ''}>${{ hub: 'Base (check-in and hand-in point)', stop: 'Location', bonus: 'Bonus question (shown on the finish screen)' }[r]}</option>`).join('');
     const iconOptions = LOCATION_ICONS.map((n) => `<option value="${n}" ${stopIconName(stop) === n ? 'selected' : ''}>${n}</option>`).join('');
@@ -99,14 +100,19 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
       ${stop.role === 'stop' ? `<section class="panel"><h3 class="sec">Find it: the hint</h3><div class="form-grid">
         <label class="field wide">Hint shown at the base once this location is released<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>
       </div></section>
-      <section class="panel"><h3 class="sec">Unlock it: the question</h3><p class="hint">Shown at the base with the hint. The team opens the link, solves it, then types the flag when they are standing at the location. Leave the flag empty to unlock on discovery.</p><div class="form-grid">
-        <label class="field wide">Question title (optional if you add images)<textarea id="ed-eq" rows="2" placeholder="What is the name carved above the door?">${esc(stop.entryQuestion || '')}</textarea></label>
-        ${field('ed-eu', 'Question link (optional, https://...)', stop.entryUrl || '', 'wide')}
-        <div class="field wide"><span>Question images (optional, up to 6; shown to the team at the base)</span>
-          ${stop.isNew ? '<p class="hint">Create the location first, then add images.</p>' : `<div class="refs">${(stop.entryImages || []).map((path, i) => `<div class="ref"><img src="${esc(api.entryImageUrl(path))}" alt="Unlock question image" loading="lazy" /><button type="button" data-del-eimg="${i}" aria-label="Remove image">${icon('x')}</button></div>`).join('')}</div>
-          <label class="ref-add">${icon('plus')} Upload images<input type="file" accept="image/*" multiple data-eimg /></label>`}</div>
-        ${field('ed-ea', 'Flag that unlocks it', stop.entryAnswer || '', 'wide')}
-      </div></section>
+      <section class="panel"><h3 class="sec">Unlock it: the question</h3>
+        <label class="field">How do teams unlock it?<select id="ed-ek"><option value="flag" ${unlockPhoto ? '' : 'selected'}>Flag question (solve it, type the flag)</option><option value="photo" ${unlockPhoto ? 'selected' : ''}>Image question (photograph it, checked by AI)</option></select></label>
+        ${unlockPhoto ? `<p class="hint">Shown at the base with the hint. At the location the team takes a photo; the AI compares it with your reference photos and unlocks the location when it matches (doubtful ones go to the Photos tab).</p><div class="form-grid">
+          <label class="field wide">Clue: describe what to photograph<textarea id="ed-eq" rows="2" placeholder="The big clock above the library entrance">${esc(stop.entryQuestion || '')}</textarea></label>
+          <div class="field wide">${stop.isNew ? '<p class="hint">Create the location first, then upload its reference photos.</p>' : `<div class="ref-count ${(stop.entryRefs || []).length < MIN_REFS ? 'low' : ''}">${(stop.entryRefs || []).length} reference photo${(stop.entryRefs || []).length === 1 ? '' : 's'} · take about ${TARGET_REFS} of the real object from different angles${(stop.entryRefs || []).length < MIN_REFS ? ` (at least ${MIN_REFS} needed before players can unlock it)` : ''}</div>
+            <div class="refs">${(stop.entryRefs || []).map((r) => `<div class="ref"><img src="${esc(C.urls[r.path] || r.path)}" alt="reference" loading="lazy" /><button type="button" data-del-eref="${esc(r.id)}" aria-label="Remove photo">${icon('x')}</button></div>`).join('')}
+            <label class="ref-add">${icon('plus')} Upload photos<input type="file" accept="image/*" multiple data-eref /></label></div>`}</div>
+        </div>` : `<p class="hint">Shown at the base with the hint. The team opens the link, solves it, then types the flag when they are standing at the location. Leave the flag empty to unlock on discovery.</p><div class="form-grid">
+          <label class="field wide">Question title<textarea id="ed-eq" rows="2" placeholder="What is the name carved above the door?">${esc(stop.entryQuestion || '')}</textarea></label>
+          ${field('ed-eu', 'Question link (optional, https://...)', stop.entryUrl || '', 'wide')}
+          ${field('ed-ea', 'Flag that unlocks it', stop.entryAnswer || '', 'wide')}
+        </div>`}
+      </section>
       <section class="panel"><h3 class="sec">Clear it: the handoff</h3><div class="form-grid">
         ${field('ed-exit', 'Location code, shown when cleared and handed in at the base', stop.exitFlag || '', 'wide')}
         <label class="field wide">Next clue, shown when this location is cleared<textarea id="ed-clue">${esc(stop.nextClue || '')}</textarea></label>
@@ -118,9 +124,19 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
         <label class="field wide">Description<textarea id="ed-desc">${esc(stop.description)}</textarea></label>
         ${isHubStop || stop.role === 'bonus' ? `<label class="field wide">Hint<textarea id="ed-hint">${esc(stop.hint)}</textarea></label>` : ''}
       </div></details>
-      ${stop.isNew || isHubStop ? (stop.isNew ? '<p class="hint">Create the location first, then add its questions.</p>' : '<p class="hint">The base has no questions. Teams check in here, read each released location\'s hint and entry question, and hand in location codes.</p>')
-        : `<section class="panel"><h3 class="sec">Questions</h3><div class="btn-row"><button type="button" class="btn" data-add-q="photo">${icon('camera')} Photo question</button><button type="button" class="btn" data-add-q="flag">${icon('flag')} Plain question</button></div>${questions || '<div class="empty">No questions yet. Aim for 2-3 per location.</div>'}</section>`}`;
+      ${stop.isNew || isHubStop ? (stop.isNew ? '<p class="hint">Create the location first, then add its questions.</p>' : hintsPanel())
+        : `<section class="panel"><h3 class="sec">Questions</h3><div class="btn-row"><button type="button" class="btn" data-add-q="photo">${icon('camera')} Image question</button><button type="button" class="btn" data-add-q="flag">${icon('flag')} Flag question</button></div>${questions || '<div class="empty">No questions yet. Aim for 2-3 per location.</div>'}</section>`}`;
     hydrateIcons(box);
+  }
+
+  /** The base is where teams read each location's hint, so all hints are edited here in one place (each is also on its location). */
+  function hintsPanel() {
+    const list = playable();
+    return `<section class="panel"><h3 class="sec">Hints shown at the base</h3>
+      <p class="hint">Teams check in here, then see only the next location's hint and unlock question. Location 1's hint is the first one they see. Edit every hint here, in walking order.</p>
+      ${list.length ? `<div class="form-grid">${list.map((x, i) => `<label class="field wide">${i + 1}. ${esc(x.place || x.name || x.id)}<textarea data-hint-for="${esc(x.id)}" rows="2" placeholder="A riddle or clue that points to this location">${esc(x.hint || '')}</textarea></label>`).join('')}</div>
+      <div class="btn-row"><button type="button" class="btn save" id="edSaveHints">Save hints</button></div>` : '<p class="hint">Add locations first.</p>'}</section>
+      <p class="hint">The base itself has no questions. Teams also hand in each location's code here.</p>`;
   }
 
   function statLine(stopId, idx) {
@@ -131,25 +147,25 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
 
   function questionCard(stop, p) {
     const refs = p.refs || [];
-    return `<div class="q-card" data-q="${p.idx}"><h4><span>Question ${p.idx + 1}</span><span class="kind-tag ${p.kind}">${p.kind === 'photo' ? 'Photo, then link' : 'Plain'}</span></h4>
+    return `<div class="q-card" data-q="${p.idx}"><h4><span>Question ${p.idx + 1}</span><span class="kind-tag ${p.kind}">${p.kind === 'photo' ? 'Image question' : 'Flag question'}</span></h4>
       ${qFields(p, `q${p.idx}`)}${statLine(stop.id, p.idx)}
       ${p.kind === 'photo' ? `<div><div class="ref-count ${refs.length < MIN_REFS ? 'low' : ''}">${refs.length} reference photo${refs.length === 1 ? '' : 's'} · take about ${TARGET_REFS} of the real object from different angles${refs.length < MIN_REFS ? ` (at least ${MIN_REFS} needed before players can use it)` : ''}</div>
         <div class="refs">${refs.map((r) => `<div class="ref"><img src="${esc(C.urls[r.path] || '')}" alt="reference" loading="lazy" /><button type="button" data-del-ref="${p.idx}:${esc(r.id)}" aria-label="Remove photo">${icon('x')}</button></div>`).join('')}
         <label class="ref-add">${icon('plus')} Upload photos<input type="file" accept="image/*" multiple data-upload="${p.idx}" /></label></div></div>` : ''}
       <div class="btn-row"><button type="button" class="btn save" data-save-q="${p.idx}">Save question</button><button type="button" class="btn danger" data-del-q="${p.idx}">Delete</button></div></div>`;
   }
-  /** A question is a title, a link to the real question page, the answer flag, and (photo questions) a clue. */
+  /** Two kinds. Image question: a title and a clue; players photograph the object and the AI check solves it. Flag question: a title, a link to the real question page, and the answer flag. */
   function qFields(p, key) {
     const photo = p.kind === 'photo';
     return `<div class="form-grid">
       <label class="field">Title<input data-f="${key}-title" value="${esc(p.title)}" /></label>
-      <label class="field">Type<select data-f="${key}-kind" data-kind-switch="${key}"><option value="photo" ${photo ? 'selected' : ''}>Photo of a real object, then the question link</option><option value="flag" ${!photo ? 'selected' : ''}>Question link only</option></select></label>
-      <label class="field wide">${photo ? 'Clue (describe the object to find; the AI reads this too)' : 'Note for players (optional)'}<textarea data-f="${key}-prompt">${esc(p.prompt)}</textarea></label>
-      <label class="field wide">Link to the question page${photo ? ' (revealed only after the photo is verified)' : ''}<input data-f="${key}-url" type="url" inputmode="url" placeholder="https://" value="${esc(p.questionUrl || '')}" /></label>
-      <label class="field wide">Answer flag<input data-f="${key}-flag" value="${esc(p.flag || '')}" placeholder="KQ{...}" /></label></div>`;
+      <label class="field">Type<select data-f="${key}-kind" data-kind-switch="${key}"><option value="photo" ${photo ? 'selected' : ''}>Image question (photo, checked by AI)</option><option value="flag" ${!photo ? 'selected' : ''}>Flag question (link + flag)</option></select></label>
+      <label class="field wide">${photo ? 'Clue (describe the object to photograph; the AI reads this too)' : 'Note for players (optional)'}<textarea data-f="${key}-prompt">${esc(p.prompt)}</textarea></label>
+      ${photo ? '' : `<label class="field wide">Link to the question page<input data-f="${key}-url" type="url" inputmode="url" placeholder="https://" value="${esc(p.questionUrl || '')}" /></label>
+      <label class="field wide">Answer flag<input data-f="${key}-flag" value="${esc(p.flag || '')}" placeholder="KQ{...}" /></label>`}</div>`;
   }
   function draftCard(d) {
-    return `<div class="q-card" data-draft="${esc(d.key)}"><h4><span>New question</span><span class="kind-tag ${d.kind}">${d.kind === 'photo' ? 'Photo, then link' : 'Plain'}</span></h4>
+    return `<div class="q-card" data-draft="${esc(d.key)}"><h4><span>New question</span><span class="kind-tag ${d.kind}">${d.kind === 'photo' ? 'Image question' : 'Flag question'}</span></h4>
       ${qFields(d, d.key)}${d.kind === 'photo' ? '<p class="hint">Save the question, then upload its reference photos.</p>' : ''}
       <div class="btn-row"><button type="button" class="btn save" data-save-draft="${esc(d.key)}">Save question</button><button type="button" class="btn" data-drop-draft="${esc(d.key)}">Discard</button></div></div>`;
   }
@@ -163,7 +179,7 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
     return {
       id: stop.isNew ? v('#ed-id') : stop.id, role: v('#ed-role') || stop.role, entryMode: v('#ed-mode') || stop.entryMode, place: v('#ed-place'), name: v('#ed-name'), label: v('#ed-label'),
       type: v('#ed-type'), icon: v('#ed-icon'), description: v('#ed-desc'), lat: Number(v('#ed-lat')), lng: Number(v('#ed-lng')), radius: Number(v('#ed-radius')),
-      hint: v('#ed-hint'), entryQuestion: v('#ed-eq'), entryUrl: v('#ed-eu'), entryAnswer: v('#ed-ea'), exitFlag: v('#ed-exit'), nextClue: v('#ed-clue'),
+      hint: v('#ed-hint'), entryKind: v('#ed-ek') || stop.entryKind || 'flag', entryQuestion: v('#ed-eq'), entryUrl: v('#ed-eu'), entryAnswer: v('#ed-ea'), exitFlag: v('#ed-exit'), nextClue: v('#ed-clue'),
     };
   }
 
@@ -201,9 +217,19 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
       C.selected = result.id || body.id.toLowerCase();
       await changed('Location saved.');
     }
+    if (t.id === 'edSaveHints') {
+      let failed = null;
+      for (const box of $('#locEditor').querySelectorAll('[data-hint-for]')) {
+        const target = C.stops.find((x) => x.id === box.dataset.hintFor);
+        if (!target || box.value.trim() === (target.hint || '').trim()) continue;
+        const result = await api.adminSaveLocation({ ...target, hint: box.value.trim() });
+        if (!result.ok) { failed = `${target.place}: ${result.error}`; break; }
+      }
+      return failed ? toast(failed) : changed('Hints saved.');
+    }
     if (t.id === 'edQr') { if (!(await printQrSheet([stop]).catch(() => false))) toast('Allow pop-ups to print the QR code.'); }
     if (t.id === 'edDeleteLoc' && confirm(`Delete "${stop.place}" and all its questions? Teams' progress on it is lost.`)) {
-      const refPaths = stop.puzzles.flatMap((p) => (p.refs || []).map((r) => r.path));
+      const refPaths = [...(stop.entryRefs || []).map((r) => r.path), ...stop.puzzles.flatMap((p) => (p.refs || []).map((r) => r.path))];
       const result = await api.adminDeleteLocation(stop.id);
       if (!result.ok) return toast(result.error);
       if (refPaths.length) await api.adminRemoveFiles(refPaths);
@@ -239,10 +265,11 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
       const result = await api.adminDeleteQuestion(stop.id, Number(delQ.dataset.delQ));
       return result.ok ? changed('Question deleted.') : toast(result.error);
     }
-    const delImg = t.closest('[data-del-eimg]');
-    if (delImg) {
-      const result = await api.adminRemoveEntryImage(stop.id, stop.entryImages || [], Number(delImg.dataset.delEimg));
-      return result.ok ? changed('Image removed.') : toast(result.error);
+    const delEref = t.closest('[data-del-eref]');
+    if (delEref) {
+      const ref = (stop.entryRefs || []).find((r) => r.id === delEref.dataset.delEref);
+      const result = await api.adminDeleteEntryRef(stop.id, ref);
+      return result.ok ? changed('Photo removed.') : toast(result.error);
     }
     const delRef = t.closest('[data-del-ref]');
     if (delRef) {
@@ -256,8 +283,8 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
   $('#locEditor').addEventListener('change', async (e) => {
     const t = e.target;
     // Role / unlock mode change which fields exist: redraw from the working copy.
-    if (t.id === 'ed-role' || t.id === 'ed-mode') {
-      C.working = { ...C.working, ...readLocation(C.working), role: $('#ed-role').value, entryMode: $('#ed-mode')?.value || C.working.entryMode };
+    if (t.id === 'ed-role' || t.id === 'ed-mode' || t.id === 'ed-ek') {
+      C.working = { ...C.working, ...readLocation(C.working), role: $('#ed-role').value, entryMode: $('#ed-mode')?.value || C.working.entryMode, entryKind: $('#ed-ek')?.value || C.working.entryKind };
       renderEditor();
       return;
     }
@@ -275,13 +302,13 @@ export function initContent({ toast, placeOnMap, mapCenter, onChanged }) {
       }
       return;
     }
-    if (t.dataset.eimg !== undefined) {
+    if (t.dataset.eref !== undefined) {
       const stop = current();
       const files = [...t.files];
       if (!files.length) return;
-      toast(`Uploading ${files.length} image${files.length === 1 ? '' : 's'}…`);
-      const result = await api.adminAddEntryImages(stop.id, stop.entryImages || [], files);
-      return result.ok ? changed('Images added.') : toast(result.error);
+      toast(`Uploading ${files.length} photo${files.length === 1 ? '' : 's'}…`);
+      const result = await api.adminUploadEntryRefs(stop.id, files);
+      return result.ok ? changed(`${result.count} photo${result.count === 1 ? '' : 's'} added.`) : toast(result.error);
     }
     if (t.dataset.upload !== undefined) {
       const stop = current();
