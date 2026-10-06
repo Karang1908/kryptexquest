@@ -2,8 +2,8 @@
 // access control lives in the database (see supabase/migrations).
 export const CONFIG = {
   // Leave both empty to run in local demo mode (no sign-in, sample content in data.js).
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'https://ojcpwpurpelxxluwrnus.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qY3B3cHVycGVseHhsdXdybnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNTcxNjksImV4cCI6MjEwNjgzMzE2OX0.2lt4kcTFfMnqH9Fe0WxuH2-9UkH2n-gXSNN8A_GXvhc',
 
   allowedEmailDomain: 'dubai.bits-pilani.ac.in',
 
