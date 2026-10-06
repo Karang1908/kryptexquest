@@ -15,5 +15,5 @@ export const CONFIG = {
 
   // Walk-around simulator (WASD / on-screen pad) for testing off campus.
   // Set false for the live event; the server must still verify location.
-  allowSimulator: true,
+  allowSimulator: false,
 };
