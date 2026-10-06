@@ -4,10 +4,12 @@
 // saved for an organiser to review. No -> rejected.
 // Every photo and verdict is stored, so organisers can audit and override.
 //
-// Secrets: OLLAMA_API_KEY (required). Optional: OLLAMA_MODEL (default gemma4:31b), OLLAMA_URL (default https://ollama.com/api/chat),
+// Secrets: OLLAMA_API_KEYS (required: up to 10 keys, comma or new-line separated; a key that fails is skipped and the next is tried;
+// the old single OLLAMA_API_KEY still works). Optional: OLLAMA_MODEL (default gemma4:31b), OLLAMA_URL (default https://ollama.com/api/chat),
 // PHOTO_APPROVE_AT (0.8), PHOTO_REVIEW_AT (0.5).
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { encodeBase64 } from 'jsr:@std/encoding@1/base64';
+import { AllKeysFailed, KeyError, KeyPool, parseKeys, withKeys } from './keypool.ts';
 import { buildChatBody, buildPrompt, decide, parseVerdict, pickReferences, THRESHOLDS } from './judge.ts';
 
 const cors = {
@@ -29,26 +31,45 @@ async function sha256Hex(bytes: Uint8Array) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+const ATTEMPT_MS = 20_000;     // per key: a stuck key must not hold the player's photo for long
+const MAX_ATTEMPTS = 3;        // keys tried per photo
+
+let pool: KeyPool | null = null;
+let poolFor = '';
+/** One pool per function instance, so a key that just failed is skipped by the next photos on the same instance. */
+function keyPool(): KeyPool {
+  const keys = parseKeys(Deno.env.get('OLLAMA_API_KEYS'), Deno.env.get('OLLAMA_API_KEY'));
+  const id = keys.join('\n');
+  if (!pool || poolFor !== id) { pool = new KeyPool(keys); poolFor = id; }
+  return pool;
+}
+
 async function askModel(photo: Uint8Array, refs: Uint8Array[], description: string | null) {
   const model = Deno.env.get('OLLAMA_MODEL') ?? 'gemma4:31b';
-  const body = buildChatBody(model, buildPrompt(description, refs.length), refs.map(encodeBase64), encodeBase64(photo));
-  const response = await fetch(Deno.env.get('OLLAMA_URL') ?? 'https://ollama.com/api/chat', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${Deno.env.get('OLLAMA_API_KEY')}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(45_000),
+  const body = JSON.stringify(buildChatBody(model, buildPrompt(description, refs.length), refs.map(encodeBase64), encodeBase64(photo)));
+  const { value: verdict, position, failures } = await withKeys(keyPool(), MAX_ATTEMPTS, async (key) => {
+    let response: Response;
+    try {
+      response = await fetch(Deno.env.get('OLLAMA_URL') ?? 'https://ollama.com/api/chat', {
+        method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body,
+        signal: AbortSignal.timeout(ATTEMPT_MS),
+      });
+    } catch {
+      throw new KeyError('no response', null);           // timeout or network error: try the next key
+    }
+    if (!response.ok) throw new KeyError(`Ollama ${response.status}: ${(await response.text()).slice(0, 200)}`, response.status);
+    const parsed = parseVerdict(String((await response.json())?.message?.content ?? ''));
+    if (!parsed) throw new Error('Unparseable model answer');   // the model's answer, not the key: no rotation
+    return parsed;
   });
-  if (!response.ok) throw new Error(`Ollama ${response.status}: ${(await response.text()).slice(0, 200)}`);
-  const data = await response.json();
-  const verdict = parseVerdict(String(data?.message?.content ?? ''));
-  if (!verdict) throw new Error('Unparseable model answer');
+  if (failures.length) console.warn(`photo check: key ${position} answered after ${failures.join(', ')}`);
   return { verdict, model };
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ ok: false, error: 'POST only' }, 405);
-  if (!Deno.env.get('OLLAMA_API_KEY')) return json({ ok: false, error: 'Photo review is not set up yet. Ask an organiser.' }, 501);
+  if (!parseKeys(Deno.env.get('OLLAMA_API_KEYS'), Deno.env.get('OLLAMA_API_KEY')).length) return json({ ok: false, error: 'Photo review is not set up yet. Ask an organiser.' }, 501);
 
   const url = Deno.env.get('SUPABASE_URL')!;
   const asUser = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
@@ -131,7 +152,7 @@ Deno.serve(async (req) => {
       review: Number(Deno.env.get('PHOTO_REVIEW_AT') ?? THRESHOLDS.review),
     });
   } catch (error) {
-    console.error(error);
+    console.error(error instanceof AllKeysFailed ? `photo check: every key tried failed (${error.failures.join(', ')})` : error);
     verdictKind = 'error'; reason = String((error as Error).message).slice(0, 300);
   }
 
