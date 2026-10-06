@@ -7,6 +7,7 @@ import { createWorld } from './world.js';
 import { createCompass } from './compass.js';
 import { createMotion } from './motion.js';
 import { compressImage } from './image.js';
+import { installRequired, showInstallGate } from './install.js';
 
 const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -997,6 +998,9 @@ function hideSplash() {
 }
 
 async function boot() {
+  // An installable app needs a service worker; this one caches nothing (see sw.js).
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => { /* optional */ });
+  if (installRequired()) { showInstallGate(); return; }
   captureQr();
   $('#domainHint').textContent = `@${CONFIG.allowedEmailDomain}`;
   $('#demoSignIn').hidden = api.hasBackend;
