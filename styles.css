@@ -489,3 +489,21 @@ button.gem:active { transform: translateY(3px); }
 .dialog-note.legal { text-align: center; }
 
 .photo-pick.off { opacity: 0.5; pointer-events: none; }
+
+/* ---------- install gate: a full-screen panel that cannot be closed ---------- */
+html.install-locked, html.install-locked body { overflow: hidden; }
+#installGate { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: calc(var(--safe-top) + 18px) 18px calc(var(--safe-bottom) + 18px); overflow-y: auto; background: var(--stars), radial-gradient(circle at 50% 20%, #34313f, #12111a 70%); }
+.ig-card { width: min(100%, 400px); display: grid; gap: 14px; justify-items: center; text-align: center; }
+.ig-emblem { width: 104px; height: 104px; filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.5)); }
+.ig-title { font-size: 44px; line-height: 1; margin: 0; }
+.ig-copy { margin: 0; color: var(--text); font-size: 16px; line-height: 1.5; text-wrap: pretty; }
+#igBody { width: 100%; display: grid; gap: 12px; }
+.ig-install { width: 100%; min-height: 64px; font-size: 22px; }
+.ig-steps { margin: 0; padding: 0; list-style: none; counter-reset: ig; display: grid; gap: 10px; text-align: left; }
+.ig-steps li { counter-increment: ig; position: relative; padding: 12px 14px 12px 54px; min-height: 52px; border: 3px solid var(--ink); border-radius: 16px; background: var(--recess); font-size: 15.5px; line-height: 1.4; }
+.ig-steps li::before { content: counter(ig); position: absolute; left: 12px; top: 50%; translate: 0 -50%; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--yellow); color: #3a2200; border: 3px solid var(--ink); font-family: var(--font-display); font-size: 16px; }
+.ig-share { width: 1.2em; height: 1.2em; vertical-align: -0.2em; color: var(--blue-ink); }
+.ig-note, .ig-fine { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+.ig-warn { margin: 0; padding: 10px 12px; border: 3px solid var(--ink); border-radius: 14px; background: #7a1f18; color: #ffd0cb; font-size: 14.5px; }
+.ig-done { display: grid; gap: 6px; padding: 14px; border: 3px solid var(--ink); border-radius: 16px; background: #1f6a3d; color: #fff; font-size: 16px; line-height: 1.4; }
+.ig-done b:first-child { font-family: var(--font-display); font-weight: 400; font-size: 26px; }
