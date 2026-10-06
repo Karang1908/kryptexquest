@@ -1,0 +1,5 @@
+supabase
+scripts
+serve.py
+*.md
+.DS_Store
