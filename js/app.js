@@ -246,32 +246,35 @@ function puzzleCard(stop, p) {
   if (p.locked) {
     return `<article class="puzzle locked"><div class="puzzle-head"><span class="puzzle-num">${p.idx + 1}</span><strong>Question ${p.idx + 1}</strong><small>${icon('lock')} LOCKED</small></div></article>`;
   }
-  const id = `${stop.id}:${p.idx}`;
-  const photoStage = p.kind === 'photo' && !p.photoCleared && !p.solved;
-  const hasPhoto = S.photo?.id === id;
   const busy = S.busy ? 'disabled' : '';
-  const title = photoStage ? `Photo clue ${p.idx + 1}` : p.title;
-  const tag = p.solved ? esc(memberName(p.solvedBy) || 'SOLVED') : p.pending ? 'IN REVIEW' : photoStage ? 'PHOTO' : 'OPEN';
+  const image = p.kind === 'photo';
+  const tag = p.solved ? esc(memberName(p.solvedBy) || 'SOLVED') : p.pending ? 'IN REVIEW' : image ? 'IMAGE' : 'FLAG';
   let body = '';
   if (p.solved) body = '';
-  else if (photoStage) {
-    body = `<p class="clue-line">${icon('eye')} <b>Clue:</b> ${esc(p.prompt)}</p>
-      <p class="loc-note">Find it, photograph it, and the question appears.</p>
-      ${p.pending ? `<div class="range far">${icon('clock')} An organiser is checking your photo. You can send another one if you like.</div>` : ''}
-      <label class="photo-pick">${icon('camera')} ${hasPhoto ? 'Retake photo' : 'Take a photo'}<input class="photo-input" data-idx="${p.idx}" type="file" accept="image/*" capture="environment" /></label>
-      ${hasPhoto ? `<img class="photo-preview" src="${S.photo.url}" alt="Your photo" /><button class="primary-button" type="button" data-action="verify-photo" data-idx="${p.idx}" ${busy}>${S.busy ? 'Checking…' : 'Send photo'}</button>` : ''}`;
-  } else {
-    body = `${p.kind === 'photo' ? `<span class="tick-tag">${icon('check')} Photo verified</span>` : ''}${p.kind === 'flag' && p.prompt ? `<p class="q-note">${esc(p.prompt)}</p>` : ''}
+  else if (image) body = photoPicker(`${stop.id}:${p.idx}`, p.idx, { clue: p.prompt, pending: p.pending, note: 'Find it and photograph it. The photo is checked automatically and the question is solved when it matches.' });
+  else {
+    body = `${p.prompt ? `<p class="q-note">${esc(p.prompt)}</p>` : ''}
       ${p.questionUrl ? `<a class="q-link" href="${esc(p.questionUrl)}" target="_blank" rel="noopener noreferrer">Open the question ${icon('out')}</a>` : '<p class="loc-note">The question link is not set yet. Ask an organiser.</p>'}
       <form class="flag-row" data-form="flag" data-idx="${p.idx}"><input class="flag-input" name="flag" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{...}" aria-label="Flag for ${esc(p.title)}" /><button class="small-action" type="submit" ${busy}>Submit</button></form>`;
   }
-  return `<article class="puzzle ${p.solved ? 'solved' : ''} ${photoStage ? 'photo' : ''}">
-    <div class="puzzle-head"><span class="puzzle-num">${p.solved ? icon('check') : p.idx + 1}</span><strong>${esc(title)}</strong><small>${tag}</small></div>
+  return `<article class="puzzle ${p.solved ? 'solved' : ''} ${image && !p.solved ? 'photo' : ''}">
+    <div class="puzzle-head"><span class="puzzle-num">${p.solved ? icon('check') : p.idx + 1}</span><strong>${esc(p.title)}</strong><small>${tag}</small></div>
     ${body ? `<div class="puzzle-body">${body}</div>` : ''}</article>`;
 }
 
+/** Clue, camera button, preview and send button for an image question (idx >= 0) or a location's unlock photo (idx -1). */
+function photoPicker(id, idx, { clue, pending, note, disabled = false }) {
+  const hasPhoto = S.photo?.id === id;
+  const busy = S.busy || disabled ? 'disabled' : '';
+  return `${clue ? `<p class="clue-line">${icon('eye')} <b>Clue:</b> ${esc(clue)}</p>` : ''}
+      <p class="loc-note">${note}</p>
+      ${pending ? `<div class="range far">${icon('clock')} An organiser is checking your photo. You can send another one if you like.</div>` : ''}
+      <label class="photo-pick ${disabled ? 'off' : ''}">${icon('camera')} ${hasPhoto ? 'Retake photo' : 'Take a photo'}<input class="photo-input" data-idx="${idx}" type="file" accept="image/*" capture="environment" ${disabled ? 'disabled' : ''} /></label>
+      ${hasPhoto ? `<img class="photo-preview" src="${S.photo.url}" alt="Your photo" /><button class="primary-button" type="button" data-action="verify-photo" data-idx="${idx}" ${busy}>${S.busy ? 'Checking…' : 'Send photo'}</button>` : ''}`;
+}
+
 /** The unlock question: its text, plus a link to the real question page when the organiser set one. */
-const entryLink = (stop) => `${(stop.entryImages || []).length ? `<div class="q-images">${stop.entryImages.map((src) => `<a href="${esc(src)}" target="_blank" rel="noopener noreferrer"><img src="${esc(src)}" alt="Question image" loading="lazy" /></a>`).join('')}</div>` : ''}${stop.entryUrl ? `<a class="q-link" href="${esc(stop.entryUrl)}" target="_blank" rel="noopener noreferrer">Open the question ${icon('out')}</a>` : ''}`;
+const entryLink = (stop) => (stop.entryUrl ? `<a class="q-link" href="${esc(stop.entryUrl)}" target="_blank" rel="noopener noreferrer">Open the question ${icon('out')}</a>` : '');
 function locationCard(stop, index, range) {
   const title = stop.state === 'locked' ? `Location ${index + 1}` : stop.place;
   const chip = stop.state === 'cleared' ? 'CLEARED' : stop.state === 'open' ? 'UNLOCKED' : stop.discovered ? 'DISCOVERED' : stop.released ? 'TO FIND' : 'LOCKED';
@@ -281,7 +284,7 @@ function locationCard(stop, index, range) {
   if (stop.state === 'cleared') lines.push(handed ? `<p class="loc-note">${icon('check')} Code handed in.</p>` : `<p class="loc-note">${icon('check')} Cleared. Your code: <code>${esc(stop.exitFlag)}</code>. Hand it in below to release the next location.</p>`);
   else if (stop.state === 'open') lines.push('<p class="loc-note">Unlocked. Solve its questions there.</p>');
   else if (stop.released) {
-    if (stop.entryQuestion || stop.entryImages?.length) lines.push(`${stop.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(stop.entryQuestion)}</p>` : ''}${entryLink(stop)}<p class="loc-note">The answer is this location's entry flag. Type it when you are there.</p>`);
+    if (stop.entryQuestion) lines.push(`<p class="loc-hint">${icon('note')} ${esc(stop.entryQuestion)}</p>${entryLink(stop)}<p class="loc-note">${stop.entryKind === 'photo' ? 'Photograph it when you are there to unlock this location.' : "The answer is this location's entry flag. Type it when you are there."}</p>`);
     else if (stop.entryFlag) lines.push(`<p class="loc-note">Entry flag: <code>${esc(stop.entryFlag)}</code>. Type it when you are there.</p>`);
     lines.push(`<p class="loc-note">${stop.discovered ? `${icon('pin')} Discovered. Go back and unlock it.` : `${icon('radar')} Not found yet. Explore the campus.`}</p>`);
   } else lines.push(`<p class="loc-note">${icon('lock')} Hand in the code from Location ${stop.prevOrd} below to get this location's hint and entry question.${stop.discovered ? ' (You already found it, so it stays on your map.)' : ''}</p>`);
@@ -308,7 +311,7 @@ function renderHubSheet(hub) {
       body += `<div class="section-title">Your next location</div>
         <article class="stop-card next ${next.state}"><div class="loc-head"><span class="loc-num">${next.ord}</span><strong>${next.discovered ? esc(next.place) : `Location ${next.ord}`}</strong><span class="chip-s">${next.state === 'open' ? 'UNLOCKED' : next.discovered ? 'FOUND' : 'TO FIND'}</span></div>
         ${next.hint ? `<p class="loc-hint">${icon('bulb')} ${esc(next.hint)}</p>` : ''}
-        ${next.entryQuestion || next.entryImages?.length ? `${next.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(next.entryQuestion)}</p>` : ''}${entryLink(next)}<p class="loc-note">The answer is this location's entry flag. Type it when you are there.</p>` : next.entryFlag ? `<p class="loc-note">Entry flag: <code>${esc(next.entryFlag)}</code>. Type it when you are there.</p>` : ''}
+        ${next.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(next.entryQuestion)}</p>${entryLink(next)}<p class="loc-note">${next.entryKind === 'photo' ? 'Photograph it when you are there to unlock this location.' : "The answer is this location's entry flag. Type it when you are there."}</p>` : next.entryFlag ? `<p class="loc-note">Entry flag: <code>${esc(next.entryFlag)}</code>. Type it when you are there.</p>` : ''}
         <p class="loc-note">${status}</p></article>`;
     } else if (entered.length < needed) {
       body += `<div class="section-title">Your next location</div><article class="stop-card"><p class="loc-note">${icon('lock')} Hand in the code you are holding to get your next hint.</p></article>`;
@@ -341,8 +344,8 @@ function renderStopSheet(stop) {
     body = `<div class="gate"><h3>${icon('lock')} Locked</h3><p>You found it, but locations must be unlocked <b>in order</b>. Hand in the code from <b>Location ${stop.prevOrd}</b> at the base (the vending machine area) to get this location's hint and entry question. It stays on your map.</p><button class="primary-button" type="button" data-action="open-hub">Open the base</button></div>`;
   } else if (!unlocked) {
     body = `<div class="gate"><h3>${icon('unlock')} Ready to unlock</h3>
-      ${stop.entryQuestion || stop.entryImages?.length ? `${stop.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(stop.entryQuestion)}</p>` : ''}${entryLink(stop)}` : stop.entryFlag ? `<p>Your entry flag: <code>${esc(stop.entryFlag)}</code></p>` : ''}
-      ${stop.needsFlag ? `<p class="loc-note">Type this location's entry flag to unlock it.</p>
+      ${stop.entryQuestion ? `<p class="loc-hint">${icon('note')} ${esc(stop.entryQuestion)}</p>${entryLink(stop)}` : stop.entryFlag ? `<p>Your entry flag: <code>${esc(stop.entryFlag)}</code></p>` : ''}
+      ${stop.needsPhoto ? photoPicker(`${stop.id}:-1`, -1, { clue: null, pending: stop.entryPending, note: 'Photograph it here to unlock this location. The photo is checked automatically.', disabled: !range }) : stop.needsFlag ? `<p class="loc-note">Type this location's entry flag to unlock it.</p>
       <form class="flag-row" data-form="unlock"><input class="flag-input" name="gate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KQ{ENTRY_FLAG}" aria-label="Entry flag" ${range ? '' : 'disabled'} /><button class="small-action" type="submit" ${range && !S.busy ? '' : 'disabled'}>Unlock</button></form>`
       : '<p class="loc-note">No flag needed: it unlocks by itself.</p>'}</div>`;
   } else {
@@ -422,7 +425,8 @@ document.addEventListener('click', async (event) => {
   if (action === 'verify-photo' && stop && S.photo && !S.busy && S.photo.id === `${stop.id}:${el.dataset.idx}`) {
     S.busy = true; renderSheet();
     const result = await api.verifyPhoto(stop, Number(el.dataset.idx), S.photo.blob, S.fix);
-    applyResult(stop, result, result.simulated ? 'Demo: photo accepted (simulated, not real AI). Your question is ready.' : 'Photo verified! Your question is ready.');
+    const unlockPhoto = Number(el.dataset.idx) === -1;
+    if (applyResult(stop, result, unlockPhoto ? `${stop.place || stop.name || 'Location'} unlocked!` : result.simulated ? 'Demo: photo accepted (simulated, not real AI). Question solved.' : 'Photo verified! Question solved.') && unlockPhoto && !result.pending) { buzz([200, 100, 200]); confetti(); }
   }
 });
 
@@ -483,7 +487,7 @@ async function onDiscovered(found) {
   confetti();
   const more = found.length > 1 ? ` (and ${found.length - 1} more)` : '';
   if (!stop) { toast(`Location discovered!${more}`, 'discover'); return; }
-  toast(`Location discovered: Location ${stop.ord}!${more} ${stop.released ? 'Enter its entry flag to unlock it.' : 'It is locked: unlock locations in order.'}`, 'discover');
+  toast(`Location discovered: Location ${stop.ord}!${more} ${stop.released ? (stop.needsPhoto ? 'Photograph it to unlock it.' : 'Enter its entry flag to unlock it.') : 'It is locked: unlock locations in order.'}`, 'discover');
   renderHud(); renderNear();
   S.promptedFor = stop.id;   // the card opens now; do not pop it open again when it is closed
   if (!S.openId) openStop(stop.id);
@@ -492,7 +496,7 @@ async function onDiscovered(found) {
 /** No flag set for a released location: discovering it is enough to unlock it. */
 async function autoUnlock() {
   if (S.unlocking || !S.fix || (S.view?.game?.status !== 'running' && !S.view?.team?.isTest)) return;
-  const stop = S.stops.find((s) => s.role === 'stop' && s.discovered && s.state === 'locked' && s.released && !s.needsFlag && inRange(s));
+  const stop = S.stops.find((s) => s.role === 'stop' && s.discovered && s.state === 'locked' && s.released && !s.needsFlag && !s.needsPhoto && inRange(s));
   if (!stop || Date.now() - (S.unlockTried[stop.id] || 0) < 8000) return;
   S.unlockTried[stop.id] = Date.now(); S.unlocking = true;
   try {
@@ -509,7 +513,7 @@ function checkNotices() {
   // Standing at a discovered location: open its card once per visit so the entry form (or the lock reason) is right there.
   if (S.promptedFor !== here.id && !S.openId) { S.promptedFor = here.id; openStop(here.id); }
   setLockNotice(here.released
-    ? (here.needsFlag ? `Location ${here.ord} is discovered but locked. Enter its entry flag to unlock it (tap the card below).` : '')
+    ? (here.needsPhoto ? `Location ${here.ord} is discovered but locked. Photograph it to unlock it (tap the card below).` : here.needsFlag ? `Location ${here.ord} is discovered but locked. Enter its entry flag to unlock it (tap the card below).` : '')
     : `Location ${here.ord} is locked. Unlock locations in order: hand in the code from Location ${here.prevOrd} at the base.`);
   autoUnlock();
 }
