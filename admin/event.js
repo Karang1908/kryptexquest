@@ -45,7 +45,7 @@ export function initEvent({ toast, mapCenter, flyTo, onZonesChanged, onStatusCha
     const sample = new Map(DEMO_STOPS.map((d) => [d.id, d]));
     const hub = stops.find((s) => s.role === 'hub');
     const regular = stops.filter((s) => s.role === 'stop');
-    if (!hub) add('bad', 'No base (vending machine area) location exists. Players cannot check in.');
+    if (!hub) add('bad', 'No base location exists. Players cannot check in.');
     if (!regular.length) add('bad', 'No regular locations exist.');
     const flags = new Map();
     const seen = (flag, where) => { const k = String(flag || '').trim().toUpperCase(); if (k) flags.set(k, [...(flags.get(k) || []), where]); };
