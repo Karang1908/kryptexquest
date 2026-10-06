@@ -110,7 +110,7 @@ export function checkIn(ctx) {
   const err = guard(ctx, { needStarted: false }); if (err) return fail(err);
   if (ctx.state.startedAt) return { ok: true };
   const hub = hubOf(ctx.content);
-  if (hub && !inRange(ctx.content, ctx.state, hub.id, ctx.pos, ctx.now)) return fail('Go to the base (the vending machine area) to check in.');
+  if (hub && !inRange(ctx.content, ctx.state, hub.id, ctx.pos, ctx.now)) return fail(`Go to the base (${hub.place}) to check in.`);
   ctx.state.startedAt = ctx.now;
   return { ok: true };
 }
@@ -151,7 +151,7 @@ export function unlockStop(ctx, stopId, flag) {
 export function hubFlag(ctx, flag) {
   const err = guard(ctx); if (err) return fail(err);
   const hub = hubOf(ctx.content);
-  if (hub && !inRange(ctx.content, ctx.state, hub.id, ctx.pos, ctx.now)) return fail('Hand in flags at the base (the vending machine area).');
+  if (hub && !inRange(ctx.content, ctx.state, hub.id, ctx.pos, ctx.now)) return fail(`Hand in codes at the base (${hub.place}).`);
   const stop = stopsOf(ctx.content).find((s) => norm(s.exitFlag) === norm(flag));
   if (!stop) return fail('That is not a location flag. Check it and try again.');
   if (!ctx.state.hubFlags.includes(stop.id)) { ctx.state.hubFlags.push(stop.id); stamp(ctx, 'handed', stop.id); }
