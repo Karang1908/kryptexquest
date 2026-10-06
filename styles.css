@@ -38,7 +38,7 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 .bl-icon::before { inset: 0; background: var(--ink); }
 .bl-icon::after { inset: 3.5px; background: linear-gradient(180deg, var(--m-hi), var(--m-lo)); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5); }
 .bl-icon .gi { position: relative; z-index: 1; width: 26px; height: 26px; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.4)); }
-.bl-name { padding: 2px 10px; border-radius: 999px; border: 2px solid var(--ink); background: rgba(26, 14, 66, 0.92); box-shadow: 0 2px 0 var(--ink); }
+.bl-name { padding: 2px 10px; border-radius: 999px; border: 2px solid var(--ink); background: rgba(24, 22, 34, 0.92); box-shadow: 0 2px 0 var(--ink); }
 .beacon-label[data-state='locked'] { --m-hi: var(--locked-hi); --m-lo: var(--locked-lo); color: var(--muted); }
 .beacon-label[data-state='cleared'] { --m-hi: var(--green-hi); --m-lo: var(--green-lo); }
 .beacon-label[data-state='hub'] { --m-hi: var(--red-hi); --m-lo: var(--red-lo); }
@@ -90,7 +90,7 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 .stop-orb .gi, .stop-orb .i { width: 22px; height: 22px; }
 .stop-pole { width: 3px; height: 16px; background: linear-gradient(var(--c), transparent); }
 .stop-pulse { position: absolute; left: 50%; top: 22px; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; border: 2px solid var(--c); opacity: 0; }
-.stop-label { position: absolute; top: 52px; white-space: nowrap; padding: 2px 10px; border-radius: 999px; border: 2px solid var(--ink); font-family: var(--font-display); font-size: 12px; background: rgba(26, 14, 66, 0.92); color: var(--text); pointer-events: none; }
+.stop-label { position: absolute; top: 52px; white-space: nowrap; padding: 2px 10px; border-radius: 999px; border: 2px solid var(--ink); font-family: var(--font-display); font-size: 12px; background: rgba(24, 22, 34, 0.92); color: var(--text); pointer-events: none; }
 .stop-marker.locked { --c: var(--locked); }
 .stop-marker.open { --c: var(--blue); }
 .stop-marker.near { --c: var(--yellow); }
@@ -191,7 +191,7 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 
 /* ---------- dialogs ---------- */
 .app-dialog { position: relative; width: min(92vw, 410px); padding: 26px 20px 22px; border: 3px solid var(--ink); border-radius: 26px; background: var(--stars), linear-gradient(180deg, #2f2c3f, #211f2e); color: var(--text); box-shadow: var(--panel-shadow), 0 40px 90px -30px #000, inset 0 3px 0 rgba(255, 255, 255, 0.16); overflow: visible; }
-.app-dialog::backdrop { background: rgba(12, 6, 32, 0.82); }
+.app-dialog::backdrop { background: rgba(11, 10, 16, 0.82); }
 .app-dialog[open] { animation: pop 0.35s var(--pop); }
 .app-dialog h2 { font-size: 32px; margin: 0 0 14px; padding-right: 50px; color: #fff; -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; text-shadow: 0 4px 0 var(--ink); }
 .dialog-close { position: absolute; top: -14px; right: -10px; }
@@ -325,7 +325,7 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 /* teammates on the map */
 .mate-pin { display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none; }
 .mate-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--green); border: 3px solid var(--ink); box-shadow: 0 0 0 3px #fff; }
-.mate-name { font: 400 13px/1 var(--font-display); color: #fff; background: rgba(26, 14, 66, 0.94); padding: 3px 9px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
+.mate-name { font: 400 13px/1 var(--font-display); color: #fff; background: rgba(24, 22, 34, 0.94); padding: 3px 9px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
 
 /* rehearsal / offline badges */
 .hud-badge { position: absolute; top: calc(var(--safe-top) + 80px); left: 50%; transform: translateX(-50%); z-index: 6; padding: 4px 14px; border-radius: 999px; border: 3px solid var(--ink); font: 400 14px/1.2 var(--font-display); letter-spacing: 0.04em; pointer-events: none; white-space: nowrap; box-shadow: 0 3px 0 var(--ink); }
@@ -351,7 +351,7 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 
 /* ---------- reward moments: rays, a chest or medal that pops, loot ---------- */
 .reward { border: 0; background: transparent; padding: 0; width: min(92vw, 380px); color: var(--text); text-align: center; overflow: visible; }
-.reward::backdrop { background: radial-gradient(circle at 50% 36%, rgba(60, 36, 140, 0.97), rgba(12, 6, 32, 0.98) 70%); }
+.reward::backdrop { background: radial-gradient(circle at 50% 36%, rgba(52, 48, 70, 0.97), rgba(11, 10, 16, 0.98) 70%); }
 .reward[open] { display: grid; justify-items: center; gap: 12px; }
 .reward-rays { position: absolute; top: 20px; left: 50%; width: 460px; height: 460px; margin-left: -230px; pointer-events: none; opacity: 0.55; background: repeating-conic-gradient(from 0deg, rgba(255, 224, 102, 0.55) 0 8deg, transparent 8deg 24deg); -webkit-mask: radial-gradient(circle, #000 18%, transparent 68%); mask: radial-gradient(circle, #000 18%, transparent 68%); animation: spin 22s linear infinite; }
 .reward-art { position: relative; width: 190px; height: 170px; display: grid; place-items: center; animation: pop 0.55s var(--pop) both; }
