@@ -482,3 +482,8 @@ button.gem:active { transform: translateY(3px); }
 .q-images { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 8px 0; }
 .q-images a { display: block; border-radius: 12px; overflow: hidden; border: 3px solid var(--ink); background: var(--recess); }
 .q-images img { display: block; width: 100%; max-height: 220px; object-fit: cover; }
+
+/* emblem above the title on the sign-in and loading screens */
+.login-emblem, .splash-emblem { width: 112px; height: 112px; justify-self: center; margin-bottom: -6px; filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.5)); animation: pop 0.6s var(--pop) both; }
+.login-fine.legal a, .dialog-note.legal a { color: #fff; text-underline-offset: 2px; }
+.dialog-note.legal { text-align: center; }
