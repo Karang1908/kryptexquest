@@ -69,6 +69,12 @@ After the first deploy you get `https://PROJECT.vercel.app`. Test sign-in there 
 4. Then update, in this order: Supabase Site URL and Redirect URLs (step 1.8), Google "Authorised JavaScript origins" (step 2.4). The Google redirect URI stays on the Supabase address and does not change.
 5. Test sign-in on the real domain from a phone on mobile data and on campus Wi-Fi.
 
+## 6b. Your values (domain `kryptex.gdgocbpdc.tech`)
+- DNS (at the `gdgocbpdc.tech` registrar or DNS host): add a **CNAME** record, name `kryptex`, value = what Vercel shows (usually `cname.vercel-dns.com`).
+- Supabase > Auth > URL Configuration: Site URL `https://kryptex.gdgocbpdc.tech`; Redirect URLs `https://kryptex.gdgocbpdc.tech/**` and your `https://*.vercel.app/**` address while testing.
+- Google Cloud > OAuth client: Authorised JavaScript origin `https://kryptex.gdgocbpdc.tech`; redirect URI `https://ojcpwpurpelxxluwrnus.supabase.co/auth/v1/callback`.
+- Google Cloud > OAuth consent screen: Application home page `https://kryptex.gdgocbpdc.tech`, Privacy policy `https://kryptex.gdgocbpdc.tech/privacy/`, Terms of service `https://kryptex.gdgocbpdc.tech/terms/`, Authorised domain `gdgocbpdc.tech`.
+
 ## 7. Before event day
 - Real flags in, sample flags gone (the sample ones are also visible in `js/data.js`, which only matters for demo mode).
 - Real location pins surveyed on campus (the four current pins are provisional) and spaced more than 150 m apart.
