@@ -1,12 +1,12 @@
-// Install gate: on a phone, the game only runs as an installed app (home-screen icon, full screen, no browser bar).
-// In a normal browser tab the player gets a full-screen panel that cannot be closed: install, then open the app.
+// Install prompt: on a phone, the game works best as an installed app (home-screen icon, full screen, no browser bar).
+// In a normal browser tab the player gets a full-screen panel with an install button. It can be closed ("Not now"),
+// and it is not shown again in that browser tab's session.
 //
 // What the platforms allow:
 //  - Android (Chrome and most Chromium browsers): a real one-tap install through the `beforeinstallprompt` event.
 //  - iPhone/iPad: Apple gives websites no install button. The panel shows the three taps (Share, Add to Home Screen, Add).
 //  - In-app browsers (Instagram, Facebook, ...) cannot install anything: the panel asks the player to open the link in
 //    Safari or Chrome.
-// This is a client-side gate: it keeps honest players on the app, it is not a security boundary.
 import { CONFIG } from './config.js';
 import { hasBackend } from './api.js';
 
@@ -22,24 +22,24 @@ export function isStandalone() {
     || document.referrer.startsWith('android-app://'));
 }
 
-/** Organisers can open the site with ?noinstall=1 in a browser tab (kept for the tab's session). Everyone else is gated. */
-function bypassed() {
+/** Skipped for this tab's session: after "Not now", or with ?noinstall=1 (handy for organisers). */
+function skipped() {
   try {
     if (new URLSearchParams(location.search).has('noinstall')) sessionStorage.setItem('kq-noinstall', '1');
     return sessionStorage.getItem('kq-noinstall') === '1';
   } catch { return false; }
 }
 
-export function installRequired() {
-  if (!CONFIG.requireInstall || !hasBackend) return false;           // demo mode and rehearsals on a laptop stay open
-  return isMobile && !isStandalone() && !bypassed();
+export function installPromptWanted() {
+  if (!CONFIG.promptInstall || !hasBackend) return false;            // demo mode stays open
+  return isMobile && !isStandalone() && !skipped();
 }
 
 const steps = (items) => `<ol class="ig-steps">${items.map((s) => `<li>${s}</li>`).join('')}</ol>`;
 const SHARE = '<svg class="ig-share" viewBox="0 0 24 24" aria-label="Share" role="img"><path d="M12 3v12M8 7l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-/** Shows the blocking panel. Returns nothing: the page stays on it until the player opens the installed app. */
-export function showInstallGate() {
+/** Shows the install panel. `onClose` runs when the player taps "Not now" (the game then starts in the browser tab as usual). */
+export function showInstallGate(onClose) {
   document.documentElement.classList.add('install-locked');
   const root = document.createElement('div');
   root.id = 'installGate';
@@ -48,22 +48,33 @@ export function showInstallGate() {
   root.setAttribute('aria-labelledby', 'igTitle');
   root.innerHTML = `<div class="ig-card">
     <img class="ig-emblem" src="./assets/brand/kryptex-logo-256.png" alt="" width="112" height="112" />
-    <h1 id="igTitle" class="outlined ig-title">Install to play</h1>
-    <p class="ig-copy">Kryptex Quest runs as an app: full screen, steady GPS and no browser bars. Install it now to continue.</p>
+    <h1 id="igTitle" class="outlined ig-title">Install the app</h1>
+    <p class="ig-copy">Kryptex Quest plays best as an app: full screen, steadier GPS and no browser bars. It takes a few seconds.</p>
     <div id="igBody"></div>
-    <p class="ig-fine">Already installed? Close this tab and open <b>Kryptex Quest</b> from your home screen.</p>
+    <p class="ig-fine">Already installed? Open <b>Kryptex Quest</b> from your home screen.</p>
+    <button id="igClose" class="ghost-button ig-close" type="button">Not now</button>
   </div>`;
   // Nothing behind the panel may be reachable (tap, tab or screen reader).
   for (const el of document.body.children) { el.inert = true; el.setAttribute('aria-hidden', 'true'); }
   document.body.append(root);
   const body = root.querySelector('#igBody');
-  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') event.preventDefault(); }, true);
+  const close = () => {
+    try { sessionStorage.setItem('kq-noinstall', '1'); } catch { /* fine */ }
+    for (const el of document.body.children) { el.inert = false; el.removeAttribute('aria-hidden'); }
+    root.remove();
+    document.documentElement.classList.remove('install-locked');
+    document.removeEventListener('keydown', onKey, true);
+    onClose?.();
+  };
+  const onKey = (event) => { if (event.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey, true);
+  root.querySelector('#igClose').addEventListener('click', close);
 
   const installButton = () => '<button id="igInstall" class="primary-button ig-install" type="button">Install Kryptex Quest</button>';
   let finished = false;
   const done = () => {
     finished = true;
-    body.innerHTML = '<div class="ig-done"><b>Installed!</b><span>Now open <b>Kryptex Quest</b> from your home screen to start playing.</span></div>';
+    body.innerHTML = '<div class="ig-done"><b>Installed!</b><span>Open <b>Kryptex Quest</b> from your home screen to play in the app.</span></div>';
   };
 
   const render = () => {
@@ -105,7 +116,7 @@ export function showInstallGate() {
       if (choice?.outcome === 'accepted') return done();
     } catch { /* fall through to the manual steps */ }
     render();
-    body.insertAdjacentHTML('afterbegin', '<p class="ig-warn">You need to install the app to play.</p>');
+    body.insertAdjacentHTML('afterbegin', '<p class="ig-warn">The install was not completed. You can try again or tap Not now.</p>');
   }
 
   window.addEventListener('beforeinstallprompt', (event) => { event.preventDefault(); window.__bip = event; render(); });
