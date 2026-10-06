@@ -5,7 +5,7 @@ The site is static files (no build). Vercel serves them; Supabase is the backend
 ## 0. What is already prepared in the repo
 - `vercel.json`: no build, security headers (geolocation and camera allowed for the site only), `/admin` marked noindex, long cache for `assets/`, and redirects that hide `/supabase`, `/scripts`, `serve.py` and every `.md` file.
 - `.vercelignore`: keeps `supabase/`, `scripts/` and the docs out of a CLI upload.
-- HTML, JS and CSS use Vercel's default `max-age=0, must-revalidate`, so phones pick up a new deploy on the next load.
+- `vercel.json` sets `Cache-Control: max-age=0, must-revalidate` on everything except `assets/` (7 days). Vercel's default for JS and CSS is 4 hours, which left phones on an old `config.js` after the first deploy.
 - Remote dependencies (all pinned): MapLibre (unpkg), three.js and supabase-js (jsdelivr), model-viewer (ajax.googleapis.com), OpenFreeMap tiles, Google Fonts. Event-day risk: if campus Wi-Fi blocks one of these, the game breaks. Test on the real network.
 
 ## 1. Supabase project
