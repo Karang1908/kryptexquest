@@ -77,6 +77,11 @@ Event tab: start / pause / end (plus optional scheduled start and hard end), bro
 - The base editor lists every location's hint in one panel ("Hints shown at the base"); each hint is also on its location.
 - 0015 locks the public anon key out of every function except `public_leaderboard`. Live project: 0014 and 0015 applied and `verify-photo` redeployed on 2026-10-06.
 
+### Live verification, 2026-10-06
+- **Event content loaded** from `content/event.yaml` (git-ignored; repo is public): Lobby (base) + Sports Complex (image unlock, 1 flag question), Mechanical Block and Library (image unlock, image Q1, flag Q2, flag Q3). 55/55 fields on the live DB match the file; 37 reference photos in `puzzle-refs`. Pins are placeholders.
+- **AI photo check verified against real Ollama** (`gemma4:31b`, the deployed judge.ts + keypool.ts, the exact stored reference photos): 15/15 correct for the 5 image checks (held-out correct photo -> match; photo of another location's object -> no_match; unrelated image -> no_match), 2-9 s per call, key rotation working. Found and fixed: gemma4 reports confidence as certainty in its own answer (`same=false, confidence=1`), which the old `decide()` sent to manual review; `decide()` now converts to P(same). Not tested: a *similar* object elsewhere (e.g. another fire alarm), real player photos, the full deployed function with a signed-in user.
+- 0016: live Supabase has pg-safeupdate; `admin_set_game` (Start/Pause/End) failed with "UPDATE requires a WHERE clause". Fixed. 0017: messages now use the base's name ("Lobby") instead of "the vending machine area".
+
 ### Console layout (revamp)
 Navbar: Live · Teams · Locations · Photos · Event, plus a status lamp for the event clock and sign-out. Activity log lives inside Teams (Teams | Activity). Live has the map with floating stats and a move bar for relocating a location (click a pin); Locations is a sectioned editor (Basics, Where, How teams find and unlock it, Questions; More options folded); Event folds Safety and Exports.
 
