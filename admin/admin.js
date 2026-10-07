@@ -269,17 +269,38 @@ async function refreshAlerts() {
   try { A.alerts = await api.adminAlerts(); } catch (error) { console.warn('alerts failed', error); return; }
   const bar = $('#alertBar');
   bar.hidden = !A.alerts.length;
-  bar.innerHTML = A.alerts.map((a, i) => `<div class="alert ${a.kind}">${icon(a.kind === 'stalled' ? 'clock' : 'flag')}<span>${a.kind === 'stalled'
-      ? `<b>${esc(a.teamName)}</b> has done nothing for ${a.minutes} min`
-      : `<b>${esc(a.teamName)}</b> got “${esc(a.title || 'a question')}” wrong ${a.wrong}× in 15 min`}</span>
-      <button type="button" data-alert-hint="${i}">Send hint</button><button type="button" data-alert-open="${i}">Open team</button></div>`).join('');
+  if (!A.alerts.length) { A.alertsOpen = false; bar.innerHTML = ''; }
+  else {
+    // One line, however many teams need help: a summary, the most urgent two, and the rest in a dropdown over the map.
+    const order = A.alerts.map((a, i) => ({ a, i })).sort((x, y) => (x.a.kind === 'stalled') - (y.a.kind === 'stalled') || (y.a.minutes || 0) - (x.a.minutes || 0));
+    const idle = A.alerts.filter((a) => a.kind === 'stalled').length; const stuck = A.alerts.length - idle;
+    const text = (a) => (a.kind === 'stalled'
+      ? `<b>${esc(a.teamName)}</b> idle ${a.minutes} min`
+      : `<b>${esc(a.teamName)}</b> wrong ${a.wrong}× on “${esc(a.title || 'a question')}”`);
+    const row = ({ a, i }) => `<div class="alert ${a.kind}">${icon(a.kind === 'stalled' ? 'clock' : 'flag')}<span>${text(a)}</span>
+      <button type="button" data-alert-hint="${i}">Hint</button><button type="button" data-alert-open="${i}">Open</button></div>`;
+    const more = A.alerts.length > 2;
+    bar.innerHTML = `<div class="alert-sum">${icon('bell')}<span><b>${A.alerts.length}</b> team${A.alerts.length === 1 ? '' : 's'} need${A.alerts.length === 1 ? 's' : ''} attention <small>${[stuck ? `${stuck} stuck` : '', idle ? `${idle} idle` : ''].filter(Boolean).join(' · ')}</small></span></div>
+      <div class="alert-top">${order.slice(0, 2).map(row).join('')}</div>
+      ${more ? `<button type="button" class="alert-more" data-alert-toggle aria-expanded="${A.alertsOpen ? 'true' : 'false'}">${A.alertsOpen ? 'Hide' : `Show all ${A.alerts.length}`}</button>
+      <div class="alert-drop" ${A.alertsOpen ? '' : 'hidden'}>${order.map(row).join('')}</div>` : ''}`;
+  }
   if (A.tab === 'teams' && A.pane === 'teams') renderTeamList();
 }
 $('#alertBar').addEventListener('click', async (e) => {
+  if (e.target.closest('[data-alert-toggle]')) {
+    A.alertsOpen = !A.alertsOpen;
+    $('#alertBar .alert-drop').hidden = !A.alertsOpen;
+    const t = $('#alertBar [data-alert-toggle]'); t.textContent = A.alertsOpen ? 'Hide' : `Show all ${A.alerts.length}`; t.setAttribute('aria-expanded', String(A.alertsOpen));
+    return;
+  }
   const hint = e.target.closest('[data-alert-hint]'); const open = e.target.closest('[data-alert-open]');
+  if (open && A.alertsOpen) { A.alertsOpen = false; $('#alertBar .alert-drop').hidden = true; }
   if (hint) await sendHint(A.alerts[Number(hint.dataset.alertHint)].teamId);
   if (open) { A.selectedTeam = A.alerts[Number(open.dataset.alertOpen)].teamId; switchTab('teams'); setPane('teams'); await refreshTeams(); }
 });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && A.alertsOpen) $('#alertBar [data-alert-toggle]')?.click(); });
+document.addEventListener('click', (e) => { if (A.alertsOpen && !e.target.closest('#alertBar')) $('#alertBar [data-alert-toggle]')?.click(); });
 /** A one-team broadcast: the organiser types a nudge, only that team sees it. */
 async function sendHint(teamId) {
   const team = A.teams.find((t) => t.id === teamId);
